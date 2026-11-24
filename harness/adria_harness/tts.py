@@ -167,30 +167,22 @@ class IrodoriTTS:
 
     # ---------- synthesis ----------
 
-    def synthesize(self, text: str) -> bytes:
-        """Synthesize ``text`` to WAV bytes. ``text`` must already have x_ keys removed."""
+    def synthesize(self, text: str, voice: str | None = None,
+                   caption: str | None = None) -> bytes:
+        """Synthesize ``text`` to WAV bytes. ``text`` must already have x_ keys removed.
+
+        ``voice`` and ``caption`` override the configured ones for this line
+        (each persona can have its own voice).
+        """
         self.ensure_running()
         self._last_used = time.monotonic()
-        data = self._request(text)
+        data = self._request(text, voice, caption)
         self._last_used = time.monotonic()
         return data
 
-    def _request(self, text: str) -> bytes:
-        body: dict = {
-            "model": "irodori-tts",
-            "input": text,
-            "voice": self.cfg.voice,
-            "response_format": "wav",
-            "speed": self.cfg.speed,
-        }
-        irodori: dict = {"chunking_enabled": False}
-        if self.cfg.caption:
-            irodori["caption"] = self.cfg.caption
-        if self.cfg.num_steps:
-            irodori["num_steps"] = self.cfg.num_steps
-        if self.cfg.seed is not None:
-            irodori["seed"] = self.cfg.seed
-        body["irodori"] = irodori
+    def _request(self, text: str, voice: str | None = None,
+                 caption: str | None = None) -> bytes:
+        body = request_body(self.cfg, text, voice, caption)
         req = urllib.request.Request(
             self.cfg.base_url + "/v1/audio/speech",
             data=json.dumps(body, ensure_ascii=False).encode(),
@@ -202,3 +194,24 @@ class IrodoriTTS:
         except urllib.error.HTTPError as e:
             raise TTSError(f"TTS HTTP {e.code}: {e.read()[:300]!r}") from e
         return data
+
+
+def request_body(cfg: TTSConfig, text: str, voice: str | None = None,
+                 caption: str | None = None) -> dict:
+    """OpenAI-compatible speech request with Irodori extensions."""
+    irodori: dict = {"chunking_enabled": False}
+    caption = cfg.caption if caption is None else caption
+    if caption:
+        irodori["caption"] = caption
+    if cfg.num_steps:
+        irodori["num_steps"] = cfg.num_steps
+    if cfg.seed is not None:
+        irodori["seed"] = cfg.seed
+    return {
+        "model": "irodori-tts",
+        "input": text,
+        "voice": cfg.voice if voice is None else voice,
+        "response_format": "wav",
+        "speed": cfg.speed,
+        "irodori": irodori,
+    }
