@@ -48,11 +48,20 @@ adria make-voice adria   # writes adria-home/voices/adria.wav (not tracked by Gi
 
 Then set `[tts] voice = "adria"` in `config.toml`.
 
-## 4. Start and stop
+## 4. Build the display app
 
-- Start: double-click `scripts/start.command` in Finder (or run `scripts/start.sh`).
+```bash
+adria-engine/scripts/build-app.sh   # writes app/build/ADRIA.app (no Xcode needed)
+```
+
+Copy `persona-templates/display.example.json` to `adria-home/display.json` and point `vrm` at a model in `adria-home/avatars/` first. See [display.md](display.md) for the settings.
+Rebuild after moving `adria-home`, because the build records its location in the app.
+
+## 5. Start and stop
+
+- Start: double-click `scripts/start.command` in Finder (or run `scripts/start.sh`). It opens the display app when it has been built, then starts the voice loop.
   - The first time, macOS asks for microphone permission for Terminal.
-- Stop: Ctrl-C or close the Terminal window. `scripts/stop.sh` also stops the TTS server and unloads the LLM.
+- Stop: Ctrl-C or close the Terminal window (the display app stays open; quit it with Cmd-Q). `scripts/stop.sh` stops everything: the voice loop, the display app, the TTS server, and the loaded LLM.
 
 ## Commands for checking
 
@@ -70,9 +79,8 @@ Runtime files live in `ADRIA_HOME/runtime/` (not tracked by Git).
 | File | Content |
 |---|---|
 | `queue.jsonl` | Playback queue, one JSON object per line. Written to `.part` first, then renamed |
-| `now_playing` | The line being played (with its `x_` keys, `audio_path`, `started_at`, `duration`), or `{"playing": false}` |
-| `state` | `idle` / `listening` / `thinking` / `speaking` |
-| `audio/current.wav` | Audio being played (for lip-sync analysis) |
+| `now_playing` | The line being heard (its `x_` keys, `started_at` including output latency, `duration`, and the lip-sync `mouth` curve), or `{"playing": false}` |
+| `state` | `idle` (waiting) / `listening` (the child is speaking, or STT is running) / `thinking` (LLM generating, or the reply is being synthesized) / `speaking` |
 | `metrics.jsonl` | Latency measurements. Timestamps only, no conversation text |
 
 Keys starting with `x_` in a dialog line (expression and so on) are hints for the display side and are never sent to the TTS.
