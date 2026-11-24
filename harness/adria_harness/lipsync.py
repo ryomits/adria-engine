@@ -21,13 +21,13 @@ class LipSyncParams:
     fps: int = 100
     window_ms: float = 20.0
     attack_ms: float = 30.0  # time constant while opening
-    release_ms: float = 80.0  # time constant while closing
+    release_ms: float = 60.0  # time constant while closing
     gamma: float = 0.6  # < 1 opens the mouth more for mid-level sounds
     gate_rms: float = 0.01  # absolute RMS below which the frame counts as silence
     gate_level: float = 0.1  # level (relative to the line's loud parts) treated as silence
     ref_floor: float = 0.02  # keeps quiet lines from being over-amplified
     max_open: float = 0.9
-    snap_below: float = 0.02  # fully close once nearly closed in silence
+    snap_below: float = 0.05  # fully close once nearly closed in silence
 
 
 @dataclass(frozen=True)
@@ -50,6 +50,14 @@ def frame_rms(audio: np.ndarray, sr: int, params: LipSyncParams) -> np.ndarray:
     return np.sqrt((csum[hi] - csum[lo]) / (hi - lo))
 
 
+def normalized_level(rms: np.ndarray, params: LipSyncParams) -> np.ndarray:
+    """RMS relative to the line's loud parts (95th percentile), clipped to 0..1."""
+    if len(rms) == 0:
+        return rms
+    ref = max(float(np.percentile(rms, 95)), params.ref_floor)
+    return np.clip(rms / ref, 0.0, 1.0)
+
+
 def mouth_curve(audio: np.ndarray, sr: int, params: LipSyncParams | None = None) -> MouthCurve:
     params = params or LipSyncParams()
     if audio.ndim > 1:
@@ -57,8 +65,7 @@ def mouth_curve(audio: np.ndarray, sr: int, params: LipSyncParams | None = None)
     rms = frame_rms(audio, sr, params)
     if len(rms) == 0:
         return MouthCurve(params.fps, [])
-    ref = max(float(np.percentile(rms, 95)), params.ref_floor)
-    level = np.clip(rms / ref, 0.0, 1.0)
+    level = normalized_level(rms, params)
     target = level**params.gamma
     target[(rms < params.gate_rms) | (level < params.gate_level)] = 0.0
 
