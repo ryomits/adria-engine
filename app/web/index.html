@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ADRIA</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; }
+      canvas { display: block; }
+      #debug { position: fixed; left: 8px; top: 8px; font: 12px/1.4 ui-monospace, monospace;
+               color: #fff; background: rgba(0,0,0,.55); padding: 4px 8px; border-radius: 4px;
+               white-space: pre; display: none; }
+      body.checker { background: repeating-conic-gradient(#ddd 0 25%, #fff 0 50%) 0 0 / 24px 24px; }
+    </style>
+  </head>
+  <body>
+    <div id="debug"></div>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,21 @@
+{
+  "vrm": "avatars/your-model.vrm",
+  "window": {
+    "width": 420,
+    "height": 640,
+    "corner": "bottomRight",
+    "margin": 24,
+    "level": "front",
+    "clickThrough": false
+  },
+  "expressions": {
+    "neutral": {},
+    "happy": { "happy": 1.0 },
+    "sad": { "sad": 1.0 },
+    "angry": { "angry": 0.8 },
+    "surprised": { "surprised": 1.0 },
+    "relaxed": { "relaxed": 1.0 }
+  },
+  "lipSync": { "expression": "aa", "fallbackHz": 4 },
+  "transitionSec": 0.8
+}
