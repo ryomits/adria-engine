@@ -18,6 +18,7 @@ from pathlib import Path
 import numpy as np
 import soundfile as sf
 
+from .lipsync import mouth_curve
 from .playqueue import PlayQueue, tts_fields
 from .status import Metrics, Status
 from .tts import IrodoriTTS
@@ -112,10 +113,11 @@ class Player:
         duration = len(data) / sr
         audio_path = self.audio_dir / "current.wav"
         sf.write(audio_path, data, sr)  # lets the display app analyze levels for lip sync
+        mouth = mouth_curve(data, sr).to_json()
         started = time.time()
         self.first_play_at.setdefault(item.get("turn_id"), time.monotonic())
         self.status.set_now_playing(item, audio_path=str(audio_path), started_at=started,
-                                    duration=duration)
+                                    duration=duration, mouth=mouth)
         self.status.update(speaking=True)
         self.metrics.record("play_start", turn_id=item.get("turn_id"), seq=item.get("seq"),
                             synth_sec=round(synth_sec, 3), wait_sec=round(gap, 3),
