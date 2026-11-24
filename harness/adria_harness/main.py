@@ -121,13 +121,17 @@ def cmd_voice(cfg: Config, args) -> None:
     stt.warmup()
     stop = threading.Event()
     with App(cfg, mute=args.mute) as app:
-        listener = MicListener(cfg.stt, is_muted=app.mic_muted)
-        app.status.update(listening=True)
-        print("listening — Ctrl-C to quit")
+        # "listening" covers the child's speech and its transcription; waiting
+        # for speech is "idle".
+        listener = MicListener(
+            cfg.stt, is_muted=app.mic_muted,
+            on_speech_start=lambda: app.status.update(listening=True),
+            on_speech_discard=lambda: app.status.update(listening=False),
+        )
+        print("ready — Ctrl-C to quit")
         try:
             for audio, speech_end in listener.utterances(stop):
                 app.busy.set()
-                app.status.update(listening=False)
                 try:
                     t = time.monotonic()
                     text = stt.transcribe(audio)
@@ -140,7 +144,7 @@ def cmd_voice(cfg: Config, args) -> None:
                     app.run_turn(text, speech_end=speech_end, stt_sec=stt_sec)
                 finally:
                     app.busy.clear()
-                    app.status.update(listening=True)
+                    app.status.update(listening=False)
         except KeyboardInterrupt:
             pass
         finally:

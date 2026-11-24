@@ -107,9 +107,15 @@ class SileroVAD:
 class UtteranceSegmenter:
     """Turns a stream of 512-sample blocks (None = muted) into utterances."""
 
-    def __init__(self, cfg: STTConfig, vad: VAD):
+    def __init__(self, cfg: STTConfig, vad: VAD,
+                 on_speech_start: Callable[[], None] = lambda: None,
+                 on_speech_discard: Callable[[], None] = lambda: None):
         self.cfg = cfg
         self.vad = vad
+        # Lets the caller show "listening" from the first syllable, and drop it
+        # again when the speech turns out not to be a usable utterance.
+        self.on_speech_start = on_speech_start
+        self.on_speech_discard = on_speech_discard
 
     def segment(self, blocks: Iterable[np.ndarray | None]):
         """Yield (audio, speech_end_monotonic) for each detected utterance."""
@@ -118,6 +124,8 @@ class UtteranceSegmenter:
         max_blocks = int(self.cfg.max_utterance_sec * SAMPLE_RATE / BLOCK)
         for block in blocks:
             if block is None:
+                if speech is not None:
+                    self.on_speech_discard()
                 if speech is not None or preroll:
                     speech = None
                     preroll.clear()
@@ -129,7 +137,7 @@ class UtteranceSegmenter:
                 if event and "start" in event:
                     speech = list(preroll)
                     preroll.clear()
-                    log.debug("speech start")
+                    self.on_speech_start()
                 continue
             speech.append(block)
             ended = bool(event and "end" in event)
@@ -139,6 +147,8 @@ class UtteranceSegmenter:
                 self.vad.reset()
                 if len(audio) / SAMPLE_RATE >= self.cfg.min_utterance_sec:
                     yield audio, time.monotonic()
+                else:
+                    self.on_speech_discard()
 
 
 class MicListener:
@@ -149,9 +159,12 @@ class MicListener:
     keep arriving, and judging them later would let the character hear itself.
     """
 
-    def __init__(self, cfg: STTConfig, is_muted: Callable[[], bool]):
+    def __init__(self, cfg: STTConfig, is_muted: Callable[[], bool],
+                 on_speech_start: Callable[[], None] = lambda: None,
+                 on_speech_discard: Callable[[], None] = lambda: None):
         self.is_muted = is_muted
-        self.segmenter = UtteranceSegmenter(cfg, SileroVAD(cfg))
+        self.segmenter = UtteranceSegmenter(cfg, SileroVAD(cfg), on_speech_start,
+                                            on_speech_discard)
         self._blocks: queue.Queue[np.ndarray | None] = queue.Queue()
 
     def _callback(self, indata, frames, time_info, status):  # sounddevice thread

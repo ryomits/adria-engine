@@ -23,7 +23,7 @@ class Status:
         self.now_playing_path = runtime_dir / "now_playing"
         self.state_path = runtime_dir / "state"
         self._lock = threading.Lock()
-        self.listening = False  # mic loop is active and waiting for speech
+        self.listening = False  # the child is speaking or the speech is being transcribed
         self.thinking = 0  # number of in-flight LLM generations
         self.speaking = False
         self._state: str | None = None
