@@ -3,6 +3,12 @@
 set -uo pipefail
 source "$(dirname "$0")/_env.sh"
 pkill -INT -f "adria_harness|bin/adria voice" 2>/dev/null
+# The harness saves a summary of the current conversation with the LLM before it
+# exits; wait for that before unloading the model.
+for _ in $(seq 1 120); do
+  pgrep -f "adria_harness|bin/adria voice" >/dev/null || break
+  sleep 1
+done
 pkill -TERM -f "irodori_openai_tts" 2>/dev/null
 pkill -TERM -f "ADRIA.app/Contents/MacOS/ADRIA" 2>/dev/null
 model="$(uv run --project "$ADRIA_ENGINE/harness" python -c \
