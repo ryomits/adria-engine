@@ -15,6 +15,12 @@
   </head>
   <body>
     <div id="debug"></div>
+    <script>
+      // Report load-time errors (e.g. a module that failed to load) to the native log.
+      addEventListener("error", (e) => {
+        window.webkit?.messageHandlers?.log?.postMessage(`error: ${e.message || e.target?.src || "unknown"}`);
+      }, true);
+    </script>
     <script type="module" src="./src/main.ts"></script>
   </body>
 </html>

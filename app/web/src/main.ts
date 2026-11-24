@@ -16,6 +16,7 @@ import { approach } from "./framing/approach";
 import { CameraRig } from "./framing/cameraRig";
 import { fallbackMouth, sampleMouth } from "./lipsync/sampleMouth";
 import { blinkWeight, nextBlinkInterval } from "./motion/blink";
+import { reportToNative } from "./native/reportToNative";
 import { ProceduralMotion } from "./motion/proceduralMotion";
 import { parseState, type ConversationState, type NowPlaying } from "./signals/parseSignals";
 import { pollSignals } from "./signals/pollSignals";
@@ -52,6 +53,7 @@ async function main(): Promise<void> {
 
   const vrm = await loadAvatar(`home/${config.vrm}`);
   scene.add(vrm.scene);
+  reportToNative(`loaded ${config.vrm}`);
   const motion = new ProceduralMotion(vrm);
   const rig = new CameraRig(camera, config.framing.idle, config.transitionSec);
 
@@ -114,6 +116,9 @@ async function main(): Promise<void> {
       debugEl.textContent = `state: ${state}\nexpr:  ${exprName}\nmouth: ${mouth.toFixed(2)}`;
     }
     frames += 1;
+    if (frames === 1) {
+      reportToNative(`first frame ${renderer.domElement.width}x${renderer.domElement.height}`);
+    }
     if (still && frames === 3) document.title = "rendered";
     requestAnimationFrame(render);
   };
@@ -122,6 +127,7 @@ async function main(): Promise<void> {
 
 main().catch((err: unknown) => {
   console.error(err);
+  reportToNative(`error: ${err instanceof Error ? err.message : String(err)}`);
   if (debugEl) {
     debugEl.style.display = "block";
     debugEl.textContent = `error: ${err instanceof Error ? err.message : String(err)}`;
