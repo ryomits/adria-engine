@@ -14,7 +14,11 @@ from adria_harness.status import Metrics, Status
 class FakeTTS:
     """Returns a 0.3 s tone for any text."""
 
-    def synthesize(self, text: str) -> bytes:
+    def __init__(self):
+        self.calls: list[dict] = []
+
+    def synthesize(self, text: str, voice: str | None = None, caption: str | None = None) -> bytes:
+        self.calls.append({"text": text, "voice": voice, "caption": caption})
         sr = 16000
         t = np.arange(int(0.3 * sr)) / sr
         buf = io.BytesIO()
@@ -78,9 +82,9 @@ def test_started_at_includes_output_latency(tmp_path):
 
 
 class SlowTTS(FakeTTS):
-    def synthesize(self, text: str) -> bytes:
+    def synthesize(self, text: str, voice: str | None = None, caption: str | None = None) -> bytes:
         time.sleep(0.3)
-        return super().synthesize(text)
+        return super().synthesize(text, voice, caption)
 
 
 def test_state_is_thinking_while_the_first_line_is_synthesized(tmp_path):
@@ -91,5 +95,19 @@ def test_state_is_thinking_while_the_first_line_is_synthesized(tmp_path):
         queue.push({"id": "t-0", "turn_id": "t", "seq": 0, "text": "やあ"})
         time.sleep(0.15)  # synthesis is still running
         assert json.loads((tmp_path / "state").read_text())["state"] == "thinking"
+    finally:
+        player.stop()
+
+
+def test_line_voice_and_caption_are_passed_to_tts(tmp_path):
+    queue = PlayQueue(tmp_path)
+    tts = FakeTTS()
+    player = Player(queue, tts, Status(tmp_path), Metrics(tmp_path), mute=True)
+    player.start()
+    try:
+        queue.push({"id": "t-0", "turn_id": "t", "seq": 0, "text": "やあ",
+                    "voice": "parent-voice", "caption": "おちついた声"})
+        wait_for_playing(tmp_path / "now_playing")
+        assert tts.calls[0] == {"text": "やあ", "voice": "parent-voice", "caption": "おちついた声"}
     finally:
         player.stop()

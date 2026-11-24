@@ -66,14 +66,55 @@ class STTConfig:
 
 
 @dataclass
+class SpeakerConfig:
+    # Cosine similarity an utterance needs to count as an enrolled speaker, and
+    # how far it must be ahead of the next closest one. Both err towards
+    # "unknown", which falls back to the default (child) persona.
+    threshold: float = 0.70
+    margin: float = 0.1
+    # Shorter utterances give unreliable embeddings: treated as unknown.
+    min_audio_sec: float = 1.0
+    enroll_sec: float = 20.0  # speech collected by `adria enroll`
+    min_enroll_sec: float = 10.0
+    # Speaker id -> persona name. Unmapped and unknown speakers get the default.
+    map: dict = field(default_factory=dict)
+    # Voiceprints and the embedding model stay outside version control.
+    voiceprint_dir: Path | None = None
+    model_dir: Path | None = None
+
+
+@dataclass
+class MemoryConfig:
+    # A session ends after this long without a turn, and is then summarized.
+    idle_end_sec: int = 300
+    # Above this size the persona's memory file is merged into a shorter summary.
+    max_chars: int = 2000
+    transcript_retention_days: int = 7
+
+
+@dataclass
 class Config:
     home: Path
     runtime_dir: Path
-    persona_path: Path
+    default_persona: str
     fillers: list[str]
     llm: LLMConfig
     tts: TTSConfig
     stt: STTConfig
+    speakers: SpeakerConfig = field(default_factory=SpeakerConfig)
+    memory: MemoryConfig = field(default_factory=MemoryConfig)
+
+    @property
+    def persona_dir(self) -> Path:
+        return self.home / "personas"
+
+    @property
+    def memory_dir(self) -> Path:
+        return self.home / "memory"
+
+    @property
+    def transcript_dir(self) -> Path:
+        return self.home / "conversation-logs"
 
     @property
     def voices_dir(self) -> Path:
@@ -102,6 +143,9 @@ def load_config(home: str | os.PathLike | None = None) -> Config:
             data = tomllib.load(f)
 
     general = data.get("general", {})
+    if "persona" in general:
+        raise ConfigError('general.persona was replaced by [personas] default = "<name>" '
+                          "(a file name under personas/, without .md)")
 
     def resolve(p: str | None, default: Path) -> Path:
         if not p:
@@ -112,12 +156,17 @@ def load_config(home: str | os.PathLike | None = None) -> Config:
     cfg = Config(
         home=home_path,
         runtime_dir=resolve(general.get("runtime_dir"), home_path / "runtime"),
-        persona_path=resolve(general.get("persona"), home_path / "personas" / "child.md"),
+        default_persona=str(data.get("personas", {}).get("default", "child")),
         fillers=list(general.get("fillers", ["うーんとね。", "えっとね。"])),
         llm=_merge(LLMConfig(), data.get("llm", {})),
         tts=_merge(TTSConfig(), data.get("tts", {})),
         stt=_merge(STTConfig(), data.get("stt", {})),
+        speakers=_merge(SpeakerConfig(), data.get("speakers", {})),
+        memory=_merge(MemoryConfig(), data.get("memory", {})),
     )
+    sp = cfg.speakers
+    sp.voiceprint_dir = resolve(str(sp.voiceprint_dir or ""), home_path / "voiceprints")
+    sp.model_dir = resolve(str(sp.model_dir or ""), home_path / "models" / "spkrec-ecapa")
     env_server_dir = os.environ.get("ADRIA_TTS_SERVER_DIR")
     if env_server_dir:
         cfg.tts.server_dir = Path(env_server_dir).expanduser()
