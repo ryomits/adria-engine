@@ -1,0 +1,29 @@
+# Example of ADRIA_HOME/config.toml. Copy into the private home directory and edit.
+
+[general]
+persona = "personas/child.md"
+# Spoken while the LLM is being reloaded after an idle unload.
+fillers = ["うーんとね。", "えっとね。", "んーとね。"]
+
+[llm]
+model = "qwen3:30b-a3b-instruct-2507-q4_K_M"
+keep_alive = "10m"
+history_turns = 8
+options = { temperature = 0.7, num_ctx = 4096 }
+
+[tts]
+# Absolute path, or relative to this home directory.
+server_dir = "/path/to/Irodori-TTS-Server"
+checkpoint = "Aratako/Irodori-TTS-v4-Small"
+device = "mps"
+# "none" = voice design from the caption only. Run `adria make-voice adria`
+# and set voice = "adria" to lock the timbre across lines.
+voice = "none"
+caption = "明るくやさしい声。ゆっくりした話し方。"
+num_steps = 16
+idle_stop_sec = 1800
+
+[stt]
+model = "mlx-community/whisper-large-v3-turbo"
+language = "ja"
+min_silence_ms = 700
