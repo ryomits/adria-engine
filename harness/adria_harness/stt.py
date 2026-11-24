@@ -11,6 +11,7 @@ import logging
 import queue
 import threading
 import time
+import warnings
 from collections import deque
 from collections.abc import Callable
 
@@ -80,7 +81,12 @@ class MicListener:
 
         # TorchScript model: runs on torch, which silero-vad already depends on
         # (the ONNX variant would need onnxruntime as an extra dependency).
-        self._model = load_silero_vad(onnx=False)
+        with warnings.catch_warnings():
+            # silero-vad loads its model with torch.jit.load, which newer torch
+            # flags as deprecated. Harmless; hide only this specific warning.
+            warnings.filterwarnings("ignore", message=r".*torch\.jit\.load.*deprecated",
+                                    category=FutureWarning)
+            self._model = load_silero_vad(onnx=False)
         self._vad = VADIterator(
             self._model,
             threshold=cfg.vad_threshold,
