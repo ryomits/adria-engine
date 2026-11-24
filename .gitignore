@@ -62,5 +62,7 @@ node_modules/
 dist/
 build/
 DerivedData/
+.build/
+.swiftpm/
 xcuserdata/
 .DS_Store
