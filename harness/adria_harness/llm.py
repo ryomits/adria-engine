@@ -54,7 +54,8 @@ class OllamaClient:
                 if d.get("done"):
                     return
 
-    def chat(self, messages: list[dict], temperature: float | None = None) -> str:
+    def chat(self, messages: list[dict], temperature: float | None = None,
+             json_output: bool = False) -> str:
         """One non-streamed reply (used for session summaries)."""
         options = dict(self.cfg.options)
         if temperature is not None:
@@ -67,6 +68,8 @@ class OllamaClient:
             "keep_alive": self.cfg.keep_alive,
             "options": options,
         }
+        if json_output:
+            body["format"] = "json"
         with self._post("/api/chat", body) as r:
             d = json.load(r)
         if "error" in d:

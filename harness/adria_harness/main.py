@@ -82,7 +82,8 @@ class App:
         self.memory = MemoryStore(cfg.memory_dir)
         self.transcript = TranscriptLog(cfg.transcript_dir, cfg.memory.transcript_retention_days)
         summarizer = Summarizer(
-            lambda messages: self.llm.chat(messages, temperature=SUMMARY_TEMPERATURE),
+            lambda messages, json_output=False: self.llm.chat(
+                messages, temperature=SUMMARY_TEMPERATURE, json_output=json_output),
             self.memory, cfg.memory.max_chars,
             personas=lambda name: load_persona(cfg.persona_dir, name))
         self.summaries = SummaryWorker(summarizer, may_run=self._quiet)

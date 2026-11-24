@@ -12,7 +12,9 @@
 from __future__ import annotations
 
 import datetime as dt
+import json
 import logging
+import re
 from collections.abc import Callable
 from pathlib import Path
 
@@ -23,7 +25,9 @@ from .sessions import Session
 log = logging.getLogger(__name__)
 
 ASSISTANT_LABEL = "キャラクター"
-NOTHING = {"なし", "特になし", "- なし", "・なし"}
+# Evidence shorter than this (after normalization) proves nothing.
+MIN_EVIDENCE_CHARS = 4
+_IGNORED_IN_MATCH = re.compile(r"[\s、。，．,.!！?？「」『』（）()〜～ー…・]")
 
 MEMORY_HEADER = (
     "# これまでのおはなしのメモ\n"
@@ -32,11 +36,13 @@ MEMORY_HEADER = (
 )
 
 SUMMARY_SYSTEM = (
-    "あなたは会話の記録係です。次の会話から、次回の会話で役に立つことだけを、"
-    "日本語の短い箇条書き（各行「- 」で始める）で書いてください。\n"
+    "あなたは会話の記録係です。次の会話から、次回の会話で役に立つことだけを取り出してください。\n"
     "観点: {focus}\n"
-    "会話に出てこないことは書かないでください。推測もしないでください。"
-    "残すことがなければ「なし」とだけ書いてください。"
+    "観点に当てはまる発言が会話になければ、その観点は書かないでください。推測や想像は禁止です。\n"
+    "memo は「{user}は〜」のように第三者の立場で短く書き、evidence には根拠になった"
+    "{user}の発言をそのまま一字一句写してください。\n"
+    '出力は JSON のみ: {{"items": [{{"memo": "...", "evidence": "..."}}]}}\n'
+    '残すことがなければ {{"items": []}} を出力してください。'
 )
 
 COMPACT_SYSTEM = (
@@ -46,6 +52,39 @@ COMPACT_SYSTEM = (
     "重複はまとめ、食い違う内容は日付の新しい方を残してください。"
     "メモにないことは書かないでください。"
 )
+
+
+def _normalize(text: str) -> str:
+    return _IGNORED_IN_MATCH.sub("", text)
+
+
+def grounded_memos(reply: str, user_said: list[str]) -> list[str]:
+    """Memos from the LLM's JSON reply whose quoted evidence the user really said.
+
+    Small models fill every requested topic, inventing names and games that
+    were never mentioned. Each memo must quote what was said; memos whose quote
+    cannot be found in the user's own utterances are dropped (what the
+    character said is no evidence about the user).
+    """
+    try:
+        items = json.loads(reply).get("items", [])
+    except (ValueError, AttributeError):
+        log.warning("session summary was not valid JSON; nothing saved")
+        return []
+    said = [_normalize(u) for u in user_said]
+    memos = []
+    for item in items if isinstance(items, list) else []:
+        if not isinstance(item, dict):
+            continue
+        memo, evidence = item.get("memo"), item.get("evidence")
+        if not isinstance(memo, str) or not isinstance(evidence, str) or not memo.strip():
+            continue
+        quote = _normalize(evidence)
+        if len(quote) >= MIN_EVIDENCE_CHARS and any(quote in u for u in said):
+            memos.append(memo.strip())
+        else:
+            log.info("dropped a memo without evidence in the conversation: %r", memo)
+    return memos
 
 
 class MemoryStore:
@@ -77,7 +116,7 @@ def build_system_prompt(persona: Persona, memory: str) -> str:
     return f"{persona.prompt}\n\n{MEMORY_HEADER}\n\n{memory}"
 
 
-ChatFn = Callable[[list[dict]], str]
+ChatFn = Callable[..., str]  # (messages, json_output=False) -> reply text
 
 
 class Summarizer:
@@ -94,13 +133,16 @@ class Summarizer:
         transcript = "\n".join(
             f"{persona.memory.user_label}: {user}\n{ASSISTANT_LABEL}: {reply}"
             for user, reply in session.turns)
-        summary = self.chat([
-            {"role": "system", "content": SUMMARY_SYSTEM.format(focus=focus)},
+        reply = self.chat([
+            {"role": "system", "content": SUMMARY_SYSTEM.format(
+                focus=focus, user=persona.memory.user_label)},
             {"role": "user", "content": transcript},
-        ]).strip()
-        if not summary or summary in NOTHING:
+        ], json_output=True)
+        memos = grounded_memos(reply, [user for user, _ in session.turns])
+        if not memos:
             log.info("session with %s: nothing to remember", persona.name)
             return
+        summary = "\n".join(f"- {m}" for m in memos)
         self.store.append(persona.name, day, summary)
         log.info("saved a session summary for %s (%d chars)", persona.name, len(summary))
         self._compact_if_needed(persona, focus, day)
