@@ -132,6 +132,8 @@ def cmd_voice(cfg: Config, args) -> None:
                     t = time.monotonic()
                     text = stt.transcribe(audio)
                     stt_sec = time.monotonic() - t
+                    app.metrics.record("stt", audio_sec=round(len(audio) / 16000, 2),
+                                       stt_sec=round(stt_sec, 3), empty=not text)
                     if not text:
                         continue
                     print(f"  you: {text}")

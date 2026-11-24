@@ -47,16 +47,24 @@ With the microphone, the VAD end-of-speech silence (0.7 s) comes on top of these
 | LLM cold (TTS pre-started) | 8.5 s | A filler ("うーんとね。") is played while the LLM reloads |
 | Everything cold (right after launch) | 10.8 s | TTS server start + warmup |
 
-### Microphone session (human tester, 2026-11-24)
+### Microphone sessions (human tester, 2026-11-24)
 
-The conversation worked end to end through the microphone. Two turns were recorded in the metrics:
+Two sessions, 7 turns in total. The second session ran 5 consecutive turns without breaking down.
+Numbers exclude the VAD end-of-speech silence (0.7 s).
 
-| Turn | End of speech → first audio | STT |
-|---|---|---|
-| 1 (LLM cold, filler played first) | 3.8 s | 0.38 s |
-| 2 (warm) | 1.86 s | 0.41 s |
+| Session / turn | End of speech → first audio | STT | Note |
+|---|---|---|---|
+| 1 / 1 | 3.80 s | 0.38 s | LLM cold; filler played first |
+| 1 / 2 | 1.86 s | 0.41 s | |
+| 2 / 1 | 3.12 s | 0.41 s | |
+| 2 / 2 | 2.37 s | 0.41 s | |
+| 2 / 3 | 3.18 s | 0.41 s | |
+| 2 / 4 | 3.15 s | 0.43 s | |
+| 2 / 5 | 5.75 s | 3.42 s | STT outlier, cause unknown (utterance length was not logged; now recorded as the `stt` metric) |
 
-Perceived latency is therefore about 2.5–3.5 s when warm, including the VAD silence.
+- Warm turns: 1.86–3.18 s. Higher than the automated runs because the first sentences were longer (13–21 characters, 2.0–2.4 s to synthesize).
+- Perceived latency with the VAD silence: about 2.6–3.9 s when warm.
+- Gaps between lines were 0 s in session 2. In the cold turn of session 1, one gap was 1.4 s (the filler and the first reply lines were synthesized back to back).
 
 ## Memory (LLM and TTS resident together)
 
@@ -72,4 +80,4 @@ This leaves room for normal work. The TTS server stops after 30 minutes idle, an
 
 - During an automated run, `lsof` was sampled every second for python / ollama / uv sockets that were not loopback. None were found.
 - At runtime `HF_HUB_OFFLINE=1` is enforced. Models are downloaded only by `scripts/setup.sh`.
-- A fully offline check (Wi-Fi off) is to be done by a human.
+- A fully offline check (Wi-Fi off) was skipped by decision of the owner (2026-11-24).
