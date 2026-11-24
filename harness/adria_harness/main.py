@@ -32,6 +32,8 @@ import numpy as np
 if os.environ.get("ADRIA_ALLOW_DOWNLOAD") != "1":
     os.environ.setdefault("HF_HUB_OFFLINE", "1")
 os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
+# SpeechBrain sets each of its loggers to this level (INFO by default).
+os.environ.setdefault("SB_LOG_LEVEL", "WARNING")
 
 from .config import Config, load_config  # noqa: E402
 from .conversation import Conversation  # noqa: E402
@@ -162,7 +164,7 @@ def _setup_logging(verbose: bool) -> None:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
         datefmt="%H:%M:%S",
     )
-    for noisy in ("urllib3", "httpx", "numba", "matplotlib"):
+    for noisy in ("urllib3", "httpx", "numba", "matplotlib", "speechbrain"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
 
 
@@ -424,6 +426,8 @@ def cmd_fetch_models(cfg: Config, args) -> None:
 
     print(f"STT: {cfg.stt.model}")
     snapshot_download(cfg.stt.model)
+    print(f"speaker identification: {cfg.speakers.model_dir}")
+    EcapaEmbedder(cfg.speakers.model_dir).load()
     print(f"TTS: {cfg.tts.checkpoint} (+ codec) via first server start")
     tts = IrodoriTTS(cfg.tts, cfg.voices_dir, cfg.runtime_dir / "logs")
     try:
@@ -489,6 +493,9 @@ def main(argv: list[str] | None = None) -> None:
     # would otherwise be left behind holding several GB of memory.
     for sig in (signal.SIGTERM, signal.SIGHUP):
         signal.signal(sig, _exit_on_signal)
+    # A process started in the background by a non-interactive shell inherits
+    # SIGINT as ignored, and stop.sh (which sends SIGINT) could not stop it.
+    signal.signal(signal.SIGINT, signal.default_int_handler)
     cfg = load_config()
     if getattr(args, "seconds", "unset") is None:
         args.seconds = cfg.speakers.enroll_sec
