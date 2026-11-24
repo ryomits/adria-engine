@@ -78,7 +78,9 @@ class MicListener:
         self.is_muted = is_muted
         from silero_vad import VADIterator, load_silero_vad
 
-        self._model = load_silero_vad(onnx=True)
+        # TorchScript model: runs on torch, which silero-vad already depends on
+        # (the ONNX variant would need onnxruntime as an extra dependency).
+        self._model = load_silero_vad(onnx=False)
         self._vad = VADIterator(
             self._model,
             threshold=cfg.vad_threshold,
@@ -95,39 +97,47 @@ class MicListener:
         self._blocks.put(None if self.is_muted() else indata[:, 0].copy())
 
     def utterances(self, stop: threading.Event):
-        """Yield (audio, speech_end_monotonic) for each detected utterance."""
+        """Yield (audio, speech_end_monotonic) for each utterance from the microphone."""
         import sounddevice as sd
+
+        def blocks():
+            while not stop.is_set():
+                try:
+                    yield self._blocks.get(timeout=0.1)
+                except queue.Empty:
+                    continue
+
+        with sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype="float32",
+                            blocksize=BLOCK, callback=self._callback):
+            yield from self.segment(blocks())
+
+    def segment(self, blocks):
+        """Turn a stream of 512-sample blocks (None = muted) into utterances."""
         import torch
 
         preroll: deque[np.ndarray] = deque(maxlen=PREROLL_BLOCKS)
         speech: list[np.ndarray] | None = None
         max_blocks = int(self.cfg.max_utterance_sec * SAMPLE_RATE / BLOCK)
-        with sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype="float32",
-                            blocksize=BLOCK, callback=self._callback):
-            while not stop.is_set():
-                try:
-                    block = self._blocks.get(timeout=0.1)
-                except queue.Empty:
-                    continue
-                if block is None:
-                    if speech is not None or preroll:
-                        speech = None
-                        preroll.clear()
-                        self._vad.reset_states()
-                    continue
-                event = self._vad(torch.from_numpy(block), return_seconds=False)
-                if speech is None:
-                    preroll.append(block)
-                    if event and "start" in event:
-                        speech = list(preroll)
-                        preroll.clear()
-                        log.debug("speech start")
-                    continue
-                speech.append(block)
-                ended = bool(event and "end" in event)
-                if ended or len(speech) >= max_blocks:
-                    audio = np.concatenate(speech)
+        for block in blocks:
+            if block is None:
+                if speech is not None or preroll:
                     speech = None
+                    preroll.clear()
                     self._vad.reset_states()
-                    if len(audio) / SAMPLE_RATE >= self.cfg.min_utterance_sec:
-                        yield audio, time.monotonic()
+                continue
+            event = self._vad(torch.from_numpy(block), return_seconds=False)
+            if speech is None:
+                preroll.append(block)
+                if event and "start" in event:
+                    speech = list(preroll)
+                    preroll.clear()
+                    log.debug("speech start")
+                continue
+            speech.append(block)
+            ended = bool(event and "end" in event)
+            if ended or len(speech) >= max_blocks:
+                audio = np.concatenate(speech)
+                speech = None
+                self._vad.reset_states()
+                if len(audio) / SAMPLE_RATE >= self.cfg.min_utterance_sec:
+                    yield audio, time.monotonic()

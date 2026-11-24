@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import signal
 import sys
 import threading
 import time
@@ -250,6 +251,10 @@ def cmd_fetch_models(cfg: Config, args) -> None:
         tts.shutdown()
 
 
+def _exit_on_signal(signum, frame):
+    raise SystemExit(128 + signum)
+
+
 def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(prog="adria")
     p.add_argument("-v", "--verbose", action="store_true")
@@ -282,6 +287,11 @@ def main(argv: list[str] | None = None) -> None:
 
     args = p.parse_args(argv)
     _setup_logging(args.verbose)
+    # Closing the Terminal window (SIGHUP) or stop.sh (SIGTERM) must still run
+    # the cleanup that stops the TTS server; it runs in its own session and
+    # would otherwise be left behind holding several GB of memory.
+    for sig in (signal.SIGTERM, signal.SIGHUP):
+        signal.signal(sig, _exit_on_signal)
     args.func(load_config(), args)
 
 
