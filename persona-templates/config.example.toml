@@ -1,7 +1,6 @@
 # Example of ADRIA_HOME/config.toml. Copy into the private home directory and edit.
 
 [general]
-persona = "personas/child.md"
 # Spoken while the LLM is being reloaded after an idle unload.
 fillers = ["うーんとね。", "えっとね。", "んーとね。"]
 
@@ -27,3 +26,27 @@ idle_stop_sec = 1800
 model = "mlx-community/whisper-large-v3-turbo"
 language = "ja"
 min_silence_ms = 700
+
+[personas]
+# File name under personas/ (without .md). Used for unknown or unmapped
+# speakers, so it must be the child persona (fail-safe).
+default = "child"
+
+[speakers]
+# Cosine similarity needed to recognize an enrolled speaker, and the lead over
+# the next closest one. Raise them if family members get confused.
+threshold = 0.55
+margin = 0.1
+min_audio_sec = 1.0
+enroll_sec = 20
+
+[speakers.map]
+# speaker id (from `adria enroll <id>`) = persona name
+# parent1 = "parent"
+# parent2 = "parent"
+# kid = "child"
+
+[memory]
+idle_end_sec = 300              # a conversation ends after 5 minutes of silence
+max_chars = 2000                # merge the summaries above this size
+transcript_retention_days = 7   # full logs in conversation-logs/ (never sent to the LLM)
