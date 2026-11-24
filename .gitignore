@@ -1,0 +1,66 @@
+# Files that must never be committed (shared rule for adria-engine and adria-home).
+
+# --- VRM model files (kept locally, referenced by path only; never redistributed) ---
+*.vrm
+*.VRM
+*.glb
+*.blend
+*.blend1
+vrm/
+avatars/
+
+# --- Voiceprints / speaker enrollment data (biometric; local only) ---
+voiceprints/
+speakers/
+enrollment/
+*.voiceprint
+*.spk
+*.emb.npy
+
+# --- Full conversation logs (for parental review; 7-day retention; local only) ---
+conversation-logs/
+transcripts/
+logs/
+*.log
+
+# --- LLM / TTS / STT model data (managed by each tool) ---
+models/
+*.gguf
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.onnx
+*.mlpackage
+*.mlmodelc
+.cache/
+hf-cache/
+
+# --- Runtime data (playback queue, now_playing, synthesized audio; contains conversation text) ---
+runtime/
+*.part
+
+# --- Audio files (including TTS reference voices; local only) ---
+*.wav
+*.mp3
+*.flac
+*.m4a
+
+# --- Personal content belongs in adria-home; safety net against misplacement ---
+config.local.*
+.env
+.env.*
+
+# --- Python / Node / Xcode / macOS ---
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+node_modules/
+dist/
+build/
+DerivedData/
+xcuserdata/
+.DS_Store
