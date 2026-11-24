@@ -13,7 +13,6 @@ import threading
 import time
 from collections import deque
 from concurrent.futures import Future, ThreadPoolExecutor
-from pathlib import Path
 
 import numpy as np
 import soundfile as sf
@@ -30,14 +29,13 @@ LOOKAHEAD = 2  # number of lines synthesized ahead of the one playing
 
 class Player:
     def __init__(self, queue: PlayQueue, tts: IrodoriTTS, status: Status, metrics: Metrics,
-                 runtime_dir: Path, mute: bool = False):
+                 mute: bool = False):
         self.queue = queue
         self.tts = tts
         self.status = status
         self.metrics = metrics
-        self.audio_dir = runtime_dir / "audio"
-        self.audio_dir.mkdir(parents=True, exist_ok=True)
         self.mute = mute  # for automated tests: time playback without sound output
+        self._mute_end = 0.0
         self._exec = ThreadPoolExecutor(max_workers=1, thread_name_prefix="tts-synth")
         self._pending: deque[tuple[dict, Future]] = deque()
         # Guards the hand-over from the queue file to ``_pending`` so that
@@ -109,34 +107,45 @@ class Player:
             gap = time.monotonic() - wait_t0  # time spent waiting on synthesis
             self._play(item, data, sr, synth_sec, gap)
 
+    def _start_output(self, data: np.ndarray, sr: int) -> float:
+        """Start playback; return the output latency (time until the sound is heard)."""
+        if self.mute:
+            return 0.0
+        import sounddevice as sd
+
+        sd.play(data, sr)
+        return float(sd.get_stream().latency)
+
+    def _playing(self) -> bool:
+        if self.mute:
+            return time.monotonic() < self._mute_end
+        import sounddevice as sd
+
+        return sd.get_stream().active
+
     def _play(self, item: dict, data: np.ndarray, sr: int, synth_sec: float, gap: float) -> None:
         duration = len(data) / sr
-        audio_path = self.audio_dir / "current.wav"
-        sf.write(audio_path, data, sr)  # lets the display app analyze levels for lip sync
         mouth = mouth_curve(data, sr).to_json()
-        started = time.time()
+        self._mute_end = time.monotonic() + duration
+        latency = self._start_output(data, sr)
+        # The display samples the mouth curve by wall-clock time, so start it when
+        # the sound actually comes out (Bluetooth output can lag by 100+ ms).
+        started = time.time() + latency
         self.first_play_at.setdefault(item.get("turn_id"), time.monotonic())
-        self.status.set_now_playing(item, audio_path=str(audio_path), started_at=started,
-                                    duration=duration, mouth=mouth)
+        self.status.set_now_playing(item, started_at=started, duration=duration, mouth=mouth)
         self.status.update(speaking=True)
         self.metrics.record("play_start", turn_id=item.get("turn_id"), seq=item.get("seq"),
                             synth_sec=round(synth_sec, 3), wait_sec=round(gap, 3),
-                            duration=round(duration, 3), chars=len(item.get("text", "")))
-        log.info("play [%s#%s] %.2fs (synth %.2fs, waited %.2fs)",
-                 item.get("turn_id"), item.get("seq"), duration, synth_sec, gap)
-        if self.mute:
-            end = time.monotonic() + duration
-            while time.monotonic() < end and not self._stop.is_set():
-                self._fill()
-                time.sleep(0.02)
-        else:
+                            duration=round(duration, 3), chars=len(item.get("text", "")),
+                            output_latency=round(latency, 3))
+        log.info("play [%s#%s] %.2fs (synth %.2fs, waited %.2fs, output latency %.0f ms)",
+                 item.get("turn_id"), item.get("seq"), duration, synth_sec, gap, latency * 1000)
+        while self._playing() and not self._stop.is_set():
+            self._fill()  # keep the look-ahead synthesis busy during playback
+            time.sleep(0.02)
+        if not self.mute:
             import sounddevice as sd
 
-            sd.play(data, sr)
-            stream = sd.get_stream()
-            while stream.active and not self._stop.is_set():
-                self._fill()  # keep the look-ahead synthesis busy during playback
-                time.sleep(0.02)
             sd.stop()
         self.last_playback_end = time.monotonic()
         self.status.set_now_playing(None)

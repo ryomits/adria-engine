@@ -36,7 +36,7 @@ def wait_for_playing(path, timeout=3.0) -> dict:
 def playing_line(tmp_path):
     queue = PlayQueue(tmp_path)
     status = Status(tmp_path)
-    player = Player(queue, FakeTTS(), status, Metrics(tmp_path), tmp_path, mute=True)
+    player = Player(queue, FakeTTS(), status, Metrics(tmp_path), mute=True)
     player.start()
     queue.push({"id": "t-0", "turn_id": "t", "seq": 0, "text": "やあ", "x_expression": "happy"})
     try:
@@ -55,3 +55,23 @@ def test_mouth_curve_covers_the_line(playing_line):
 
 def test_now_playing_keeps_x_keys_for_the_display(playing_line):
     assert playing_line["x_expression"] == "happy"
+
+
+class LatentPlayer(Player):
+    """Simulates an output device that adds 0.2 s before the sound is heard."""
+
+    def _start_output(self, data, sr) -> float:
+        return 0.2
+
+
+def test_started_at_includes_output_latency(tmp_path):
+    queue = PlayQueue(tmp_path)
+    player = LatentPlayer(queue, FakeTTS(), Status(tmp_path), Metrics(tmp_path), mute=True)
+    player.start()
+    try:
+        before = time.time()
+        queue.push({"id": "t-0", "turn_id": "t", "seq": 0, "text": "やあ"})
+        line = wait_for_playing(tmp_path / "now_playing")
+        assert line["started_at"] >= before + 0.2
+    finally:
+        player.stop()

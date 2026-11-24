@@ -49,8 +49,7 @@ class App:
         self.metrics = Metrics(cfg.runtime_dir)
         self.tts = IrodoriTTS(cfg.tts, cfg.voices_dir, cfg.runtime_dir / "logs")
         self.llm = OllamaClient(cfg.llm)
-        self.player = Player(self.queue, self.tts, self.status, self.metrics, cfg.runtime_dir,
-                             mute=mute)
+        self.player = Player(self.queue, self.tts, self.status, self.metrics, mute=mute)
         self.conv = Conversation(cfg, self.llm, self.queue, self.status, self.metrics)
         self.busy = threading.Event()  # a reply turn is in progress (mic is muted)
 
