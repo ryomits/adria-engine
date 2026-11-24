@@ -8,9 +8,11 @@
 //   state=...    fixed conversation state (with "still")
 //   expr=...     fixed expression name (with "still")
 //   mouth=0..1   fixed mouth openness (with "still")
+//   vrm=avatars/x.vrm  show another model than display.json names
 import * as THREE from "three";
 import { loadAvatar } from "./avatar/loadAvatar";
 import { parseDisplayConfig } from "./config/parseDisplayConfig";
+import { selectVrmPath } from "./config/selectVrmPath";
 import { resolveExpression, type ExpressionWeights } from "./expressions/resolveExpression";
 import { approach } from "./framing/approach";
 import { CameraRig } from "./framing/cameraRig";
@@ -51,9 +53,10 @@ async function main(): Promise<void> {
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
 
-  const vrm = await loadAvatar(`home/${config.vrm}`);
+  const vrmPath = selectVrmPath(config.vrm, params.get("vrm"));
+  const vrm = await loadAvatar(`home/${vrmPath}`);
   scene.add(vrm.scene);
-  reportToNative(`loaded ${config.vrm}`);
+  reportToNative(`loaded ${vrmPath}`);
   const motion = new ProceduralMotion(vrm);
   const rig = new CameraRig(camera, config.framing.idle, config.transitionSec);
 
