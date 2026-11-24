@@ -83,6 +83,8 @@ class Player:
                 if item is None:
                     return
                 self._pending.append((item, self._exec.submit(self._synth, item)))
+                if not self.status.preparing:
+                    self.status.update(preparing=True)
 
     def _run(self) -> None:
         while not self._stop.is_set():
@@ -91,7 +93,7 @@ class Player:
                 if not self._idle.is_set():
                     # Keep "speaking" across the short gaps between lines; drop
                     # it only once everything queued has been played.
-                    self.status.update(speaking=False)
+                    self.status.update(speaking=False, preparing=False)
                 self._idle.set()
                 time.sleep(0.03)
                 continue

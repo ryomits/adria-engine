@@ -26,6 +26,8 @@ class Status:
         self.listening = False  # the child is speaking or the speech is being transcribed
         self.thinking = 0  # number of in-flight LLM generations
         self.speaking = False
+        # Reply lines are queued or being synthesized but no sound has started yet.
+        self.preparing = False
         self._state: str | None = None
         self.set_now_playing(None)
         self._publish()
@@ -51,7 +53,7 @@ class Status:
     def _compute(self) -> str:
         if self.speaking:
             return "speaking"
-        if self.thinking:
+        if self.thinking or self.preparing:
             return "thinking"
         if self.listening:
             return "listening"

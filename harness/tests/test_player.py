@@ -75,3 +75,21 @@ def test_started_at_includes_output_latency(tmp_path):
         assert line["started_at"] >= before + 0.2
     finally:
         player.stop()
+
+
+class SlowTTS(FakeTTS):
+    def synthesize(self, text: str) -> bytes:
+        time.sleep(0.3)
+        return super().synthesize(text)
+
+
+def test_state_is_thinking_while_the_first_line_is_synthesized(tmp_path):
+    queue = PlayQueue(tmp_path)
+    player = Player(queue, SlowTTS(), Status(tmp_path), Metrics(tmp_path), mute=True)
+    player.start()
+    try:
+        queue.push({"id": "t-0", "turn_id": "t", "seq": 0, "text": "やあ"})
+        time.sleep(0.15)  # synthesis is still running
+        assert json.loads((tmp_path / "state").read_text())["state"] == "thinking"
+    finally:
+        player.stop()
