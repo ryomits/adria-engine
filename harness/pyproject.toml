@@ -9,10 +9,14 @@ dependencies = [
     "soundfile>=0.13",
     "mlx-whisper>=0.4",
     "silero-vad>=5.1",
+    "speechbrain==1.1.2",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "ruff>=0.9"]
+tools = [
+    "matplotlib>=3.11.2",
+]
 
 [project.scripts]
 adria = "adria_harness.main:main"

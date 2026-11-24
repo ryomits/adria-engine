@@ -62,3 +62,19 @@ def _find_boundary(buf: str) -> int:
             continue
         i += 1
     return -1
+
+
+def limit_reply(sentences: Iterator[str], max_sentences: int, max_chars: int) -> Iterator[str]:
+    """Pass sentences through until the persona's reply length limit is reached.
+
+    The first sentence is always kept whole. Nothing is read from ``sentences``
+    after the cut, so closing the stream stops the LLM generation early.
+    """
+    total = 0
+    for count, sentence in enumerate(sentences, start=1):
+        if count > 1 and total + len(sentence) > max_chars:
+            return
+        total += len(sentence)
+        yield sentence
+        if count >= max_sentences:
+            return
