@@ -35,7 +35,7 @@ default = "child"
 [speakers]
 # Cosine similarity needed to recognize an enrolled speaker, and the lead over
 # the next closest one. Raise them if family members get confused.
-threshold = 0.55
+threshold = 0.70
 margin = 0.1
 min_audio_sec = 1.0
 enroll_sec = 20

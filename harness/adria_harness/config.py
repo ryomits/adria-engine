@@ -70,7 +70,7 @@ class SpeakerConfig:
     # Cosine similarity an utterance needs to count as an enrolled speaker, and
     # how far it must be ahead of the next closest one. Both err towards
     # "unknown", which falls back to the default (child) persona.
-    threshold: float = 0.55
+    threshold: float = 0.70
     margin: float = 0.1
     # Shorter utterances give unreliable embeddings: treated as unknown.
     min_audio_sec: float = 1.0
