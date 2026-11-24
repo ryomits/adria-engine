@@ -1,66 +1,75 @@
-# 音声ループ 実測記録
+# Voice loop measurements
 
-測定日: 2026-11-24 / 機材: Mac mini (Apple M4 Pro, メモリ 48GB), macOS 27.2.1, Ollama 0.40.18
+Date: 2026-11-24. Hardware: Mac mini (Apple M4 Pro, 48 GB RAM), macOS 27.2.1, Ollama 0.40.18.
 
-## 採用構成
+## Selected stack
 
-| 役割 | 採用 | 備考 |
+| Role | Choice | Notes |
 |---|---|---|
-| LLM | `qwen3:30b-a3b-instruct-2507-q4_K_M`（Ollama） | 非思考版。`num_ctx=4096`、`keep_alive=10m` |
-| TTS | Irodori-TTS-v4-Small（Irodori-TTS-Server, MPS, fp32） | `num_steps=16`、参照音声で声を固定 |
-| STT | `mlx-community/whisper-large-v3-turbo`（mlx-whisper） | VAD は Silero VAD（ONNX） |
+| LLM | `qwen3:30b-a3b-instruct-2507-q4_K_M` (Ollama) | Non-thinking variant. `num_ctx=4096`, `keep_alive=10m` |
+| TTS | Irodori-TTS-v4-Small (Irodori-TTS-Server, MPS, fp32) | `num_steps=16`, timbre fixed with a reference voice |
+| STT | `mlx-community/whisper-large-v3-turbo` (mlx-whisper) | Silero VAD (TorchScript) for turn detection |
 
-## LLM 候補の比較
+## LLM candidates
 
-同一の仮ペルソナ・6 往復の雑談（挨拶、好きな食べ物、公園、なぜ空は青い、またね）で比較。
+Same provisional persona, six-turn small talk (greeting, favorite food, the park, why the sky is blue, goodbye).
 
-| モデル | 初回ロード | 初トークン（ウォーム） | 生成速度 | 日本語の会話品質 |
+| Model | First load | First token (warm) | Generation | Japanese conversation quality |
 |---|---|---|---|---|
-| `qwen3:30b-a3b`（Thinking-2507） | 2.6s | — | 62〜75 tok/s | **不採用**。`think:false` が効かず、英語の思考過程が本文に混入する（テンプレートが常に `<think>` を開く思考専用版） |
-| `qwen3:8b` | 3.8s | 0.16〜0.23s | 44 tok/s | 応答は速いが、不自然な語（「お汁ごはん」「あうと」）と漢字が多い |
-| `qwen3:30b-a3b-instruct-2507-q4_K_M` | 5.9s | 0.11〜0.23s | 78〜81 tok/s | **採用**。ひらがな中心の短文で、文脈を保つ。たまに語の選び方が不自然（ペルソナ調整で対応予定） |
+| `qwen3:30b-a3b` (Thinking-2507) | 2.6 s | — | 62–75 tok/s | **Rejected.** `think:false` has no effect: its template always opens `<think>`, so English reasoning leaks into the reply |
+| `qwen3:8b` | 3.8 s | 0.16–0.23 s | 44 tok/s | Fast, but odd word choices and many kanji |
+| `qwen3:30b-a3b-instruct-2507-q4_K_M` | 5.9 s | 0.11–0.23 s | 78–81 tok/s | **Selected.** Short, hiragana-heavy replies that keep context. Occasional odd word choice (to be handled by persona tuning) |
 
-メモ: `ollama pull qwen3:30b-a3b` で取れるのは思考専用版。会話用途では `-instruct-2507` のタグを明示すること。
+Note: `ollama pull qwen3:30b-a3b` gives the thinking-only variant. For conversation, use the explicit `-instruct-2507` tag.
 
-## TTS（Irodori-TTS, MPS）
+## TTS (Irodori-TTS on MPS)
 
-| 項目 | 値 |
+| Item | Value |
 |---|---|
-| 初回セットアップ（モデル DL 込みのロード） | 874s（ネットワーク速度依存） |
-| サーバ起動（キャッシュ済み、オフライン） | 5〜10s |
-| 起動直後のウォームアップ合成 | 1.7〜3.6s（起動処理内で実施） |
-| 1 文の合成（既定 40 ステップ） | 2.7〜3.9s（RTF 0.7〜1.0） |
-| 1 文の合成（16 ステップ, 採用） | 1.0〜2.8s（RTF 0.35〜0.66） |
-| 行間の待ち（先行合成あり） | 0〜0.87s（目安 0〜1s 以内） |
+| First-time setup (model download + load) | 874 s (depends on network speed) |
+| Server start (cached, offline) | 5–10 s |
+| Warmup synthesis right after start | 1.5–3.6 s (done as part of start-up) |
+| One sentence, default 40 steps | 2.7–3.9 s (RTF 0.7–1.0) |
+| One sentence, 16 steps (selected) | 1.0–2.8 s (RTF 0.35–0.66) |
+| Gap between lines (look-ahead synthesis) | 0–0.87 s (target: under 1 s) |
 
-- bf16 は Irodori 側の制約で MPS 非対応（`precision='bf16' currently requires CUDA or XPU device`）。fp32 で運用。
-- 出力音声には Irodori の依存（sony/silentcipher）により電子透かしが埋め込まれる。処理はローカルで完結。
+- bf16 is not available on MPS (`precision='bf16' currently requires CUDA or XPU device`), so fp32 is used.
+- Irodori embeds an audio watermark in its output through its dependency sony/silentcipher. This runs locally.
 
-## 応答遅延（発話終了 → 最初の音声）
+## Response latency (end of speech → first audio)
 
-テスト用の子どもの声（TTS で生成した WAV）を STT に流す E2E テスト（`adria e2e`）で計測。
-マイク使用時は、これに VAD の無音判定（0.7s）が加わる。
+Automated runs feed child-voice WAV files (generated with the TTS) into STT (`adria e2e`).
+With the microphone, the VAD end-of-speech silence (0.7 s) comes on top of these numbers.
 
-| 状態 | 値 | 内訳 |
+| Condition | Value | Breakdown |
 |---|---|---|
-| ウォーム（LLM・TTS 常駐） | **1.7〜2.7s**（6 往復×2 回） | STT 0.38〜0.50s ＋ LLM 1 文目 約 0.3s ＋ TTS 1 文目 1.3〜2.6s |
-| LLM のみコールド（TTS は先行起動済み） | 8.5s | LLM 再ロード中に相槌（「うーんとね。」）を先に再生 |
-| 全コールド（初回起動直後） | 10.8s | TTS サーバ起動 ＋ ウォームアップ |
+| Warm (LLM and TTS resident) | **1.7–2.7 s** (6 turns × 2 runs) | STT 0.38–0.50 s + first LLM sentence ~0.3 s + first TTS sentence 1.3–2.6 s |
+| LLM cold (TTS pre-started) | 8.5 s | A filler ("うーんとね。") is played while the LLM reloads |
+| Everything cold (right after launch) | 10.8 s | TTS server start + warmup |
 
-体感遅延の目安（マイク）: ウォーム時で 約 2.5〜3.5 秒。
+### Microphone session (human tester, 2026-11-24)
 
-## メモリ（LLM と TTS の同時常駐）
+The conversation worked end to end through the microphone. Two turns were recorded in the metrics:
 
-| プロセス | 使用量 |
+| Turn | End of speech → first audio | STT |
+|---|---|---|
+| 1 (LLM cold, filler played first) | 3.8 s | 0.38 s |
+| 2 (warm) | 1.86 s | 0.41 s |
+
+Perceived latency is therefore about 2.5–3.5 s when warm, including the VAD silence.
+
+## Memory (LLM and TTS resident together)
+
+| Process | Usage |
 |---|---|
-| Ollama（LLM, `num_ctx=4096`） | 18GB（`ollama ps`） |
-| Irodori-TTS-Server（fp32, MPS） | 7.0〜8.3GB |
-| システム全体の空き | 最低 34%（約 16GB）、スワップ 0.5MB |
+| Ollama (LLM, `num_ctx=4096`) | 18 GB (`ollama ps`) |
+| Irodori-TTS-Server (fp32, MPS) | 7.0–8.3 GB |
+| System-wide free memory | at least 34% (~16 GB); swap 0.5 MB |
 
-通常作業に支障のない範囲。TTS は 30 分アイドルで停止し、LLM は 10 分アイドルでアンロードされる。
+This leaves room for normal work. The TTS server stops after 30 minutes idle, and Ollama unloads the LLM after 10 minutes idle.
 
-## 外部送信の確認
+## No external traffic
 
-- E2E テスト実行中、python / ollama / uv プロセスのループバック以外のソケットを `lsof` で 1 秒ごとに監視し、0 件だった。
-- 実行時は `HF_HUB_OFFLINE=1` を強制し、モデルの取得はセットアップ（`scripts/setup.sh`）のときだけ行う。
-- 完全オフライン（Wi-Fi オフ）での動作確認は、マイク試験と合わせて人間が実施する（未実施）。
+- During an automated run, `lsof` was sampled every second for python / ollama / uv sockets that were not loopback. None were found.
+- At runtime `HF_HUB_OFFLINE=1` is enforced. Models are downloaded only by `scripts/setup.sh`.
+- A fully offline check (Wi-Fi off) is to be done by a human.
