@@ -75,7 +75,3 @@ class OllamaClient:
         if "error" in d:
             raise RuntimeError(f"ollama error: {d['error']}")
         return d.get("message", {}).get("content", "")
-
-    def unload(self) -> None:
-        with self._post("/api/generate", {"model": self.cfg.model, "keep_alive": 0}):
-            pass

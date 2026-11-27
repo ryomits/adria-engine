@@ -70,9 +70,6 @@ class PlayQueue:
             self._write(rest)
             return head
 
-    def snapshot(self) -> list[dict]:
-        return self._read()
-
     def __len__(self) -> int:
         return len(self._read())
 

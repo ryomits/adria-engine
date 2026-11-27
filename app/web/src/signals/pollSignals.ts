@@ -1,6 +1,6 @@
 import { parseNowPlaying, parseState, type ConversationState, type NowPlaying } from "./parseSignals";
 
-export type Signals = { state: ConversationState; nowPlaying: NowPlaying | null };
+type Signals = { state: ConversationState; nowPlaying: NowPlaying | null };
 
 async function fetchJson(url: string): Promise<unknown> {
   const res = await fetch(url, { cache: "no-store" });

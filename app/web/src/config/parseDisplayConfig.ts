@@ -12,12 +12,15 @@ export type Framing = {
 };
 
 /** Which renderer draws the character. Both follow the same frames. */
-export type AvatarKind = "placeholder" | "vrm";
+type AvatarChoice =
+  | { avatar: "placeholder" }
+  | {
+      avatar: "vrm";
+      /** VRM file under ADRIA_HOME. */
+      vrm: string;
+    };
 
-export type DisplayConfig = {
-  avatar: AvatarKind;
-  /** VRM file under ADRIA_HOME (only for the "vrm" avatar). */
-  vrm: string | null;
+export type DisplayConfig = AvatarChoice & {
   expressions: ExpressionTable;
   lipSync: { expression: string; fallbackHz: number };
   framing: Record<ConversationState, Framing>;
@@ -75,19 +78,20 @@ function parseFraming(raw: unknown, base: Framing, state: string): Framing {
   return out;
 }
 
-function parseAvatar(raw: Record<string, unknown>): { avatar: AvatarKind; vrm: string | null } {
+function parseAvatar(raw: Record<string, unknown>): AvatarChoice {
   if (raw.vrm !== undefined && (typeof raw.vrm !== "string" || raw.vrm === "")) {
     throw new ConfigError("display.json: vrm must be the path of a VRM file under ADRIA_HOME");
   }
   const vrm = typeof raw.vrm === "string" ? raw.vrm : null;
-  if (raw.avatar === undefined) return { avatar: vrm ? "vrm" : "placeholder", vrm };
-  if (raw.avatar !== "placeholder" && raw.avatar !== "vrm") {
-    throw new ConfigError(`display.json: avatar must be "placeholder" or "vrm", got ${JSON.stringify(raw.avatar)}`);
+  const avatar = raw.avatar ?? (vrm ? "vrm" : "placeholder");
+  if (avatar === "placeholder") return { avatar };
+  if (avatar !== "vrm") {
+    throw new ConfigError(`display.json: avatar must be "placeholder" or "vrm", got ${JSON.stringify(avatar)}`);
   }
-  if (raw.avatar === "vrm" && !vrm) {
+  if (!vrm) {
     throw new ConfigError('display.json: avatar "vrm" needs vrm (path of the VRM file under ADRIA_HOME)');
   }
-  return { avatar: raw.avatar, vrm };
+  return { avatar, vrm };
 }
 
 export function parseDisplayConfig(raw: unknown): DisplayConfig {

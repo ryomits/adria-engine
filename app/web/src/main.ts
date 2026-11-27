@@ -38,7 +38,7 @@ function stillFrame(): AvatarFrame {
 async function createAvatar(config: DisplayConfig, options: AvatarOptions): Promise<AvatarView> {
   const stage = document.getElementById("stage");
   if (!stage) throw new Error("index.html has no #stage element");
-  if (params.get("avatar") === "placeholder" || config.vrm === null || config.avatar === "placeholder") {
+  if (params.get("avatar") === "placeholder" || config.avatar === "placeholder") {
     reportToNative("avatar: placeholder");
     return createPlaceholderAvatar(stage, options);
   }

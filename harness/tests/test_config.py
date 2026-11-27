@@ -43,12 +43,15 @@ def test_unknown_setting_is_rejected(tmp_path):
         home(tmp_path, "[memory]\nmax_char = 10\n")
 
 
-@pytest.mark.parametrize("section", ["personas", "speakers"])
-def test_removed_sections_are_rejected(tmp_path, section):
-    with pytest.raises(ConfigError, match=section):
-        home(tmp_path, f"[{section}]\n")
+def test_misspelled_section_is_rejected(tmp_path):
+    with pytest.raises(ConfigError, match="stts"):
+        home(tmp_path, "[stts]\n")
 
 
-def test_old_persona_setting_is_rejected(tmp_path):
-    with pytest.raises(ConfigError, match="persona.md"):
-        home(tmp_path, '[general]\npersona = "personas/child.md"\n')
+def test_unknown_general_key_is_rejected(tmp_path):
+    with pytest.raises(ConfigError, match="filler"):
+        home(tmp_path, '[general]\nfiller = ["えっと。"]\n')
+
+
+def test_fillers_are_read(tmp_path):
+    assert home(tmp_path, '[general]\nfillers = ["えっと。"]\n').fillers == ["えっと。"]

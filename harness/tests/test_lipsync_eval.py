@@ -1,7 +1,7 @@
 import numpy as np
 
-from adria_harness.lipsync import LipSyncParams, frame_rms, mouth_curve
-from adria_harness.lipsync_eval import closed_in_silence, flap_rate, normalized_level, onset_lags_ms
+from adria_harness.lipsync import LipSyncParams, frame_rms, mouth_curve, normalized_level
+from adria_harness.lipsync_eval import closed_in_silence, flap_rate, onset_lags_ms
 
 SR = 16000
 P = LipSyncParams()
