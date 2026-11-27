@@ -3,7 +3,7 @@
 // stays the same when the avatar is replaced.
 import type { ConversationState } from "../signals/parseSignals";
 
-export type Badge = { color: string; icon: string; label: string };
+type Badge = { color: string; icon: string; label: string };
 
 // Icons are inline SVG paths in a 24x24 box.
 const BADGES: Record<ConversationState, Badge> = {

@@ -25,7 +25,8 @@ describe("parseDisplayConfig", () => {
   });
 
   it("keeps the VRM path", () => {
-    expect(parseDisplayConfig({ vrm: "avatars/a.vrm" }).vrm).toBe("avatars/a.vrm");
+    const cfg = parseDisplayConfig({ vrm: "avatars/a.vrm" });
+    expect(cfg.avatar === "vrm" ? cfg.vrm : null).toBe("avatars/a.vrm");
   });
 
   it("provides framing for every state by default", () => {
