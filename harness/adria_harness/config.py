@@ -111,6 +111,10 @@ class Config:
         return self.home / "voices"
 
 
+SECTIONS = {"general", "llm", "tts", "stt", "conversation", "memory"}
+GENERAL_KEYS = {"runtime_dir", "fillers"}
+
+
 def _merge(dc, values: dict):
     for key, value in values.items():
         if not hasattr(dc, key):
@@ -132,14 +136,13 @@ def load_config(home: str | os.PathLike | None = None) -> Config:
         with cfg_file.open("rb") as f:
             data = tomllib.load(f)
 
-    removed = {"personas", "speakers"} & set(data)
-    if removed:
-        raise ConfigError(f"[{', '.join(sorted(removed))}] is no longer used: there is one "
-                          "persona (persona.md) and no speaker identification; delete it")
+    unknown = set(data) - SECTIONS
+    if unknown:
+        raise ConfigError(f"unknown config section(s): {', '.join(sorted(unknown))}")
     general = data.get("general", {})
-    if "persona" in general:
-        raise ConfigError("general.persona is no longer used: the persona is persona.md "
-                          "in the home directory; delete the setting")
+    unknown = set(general) - GENERAL_KEYS
+    if unknown:
+        raise ConfigError(f"unknown config key(s) in [general]: {', '.join(sorted(unknown))}")
 
     def resolve(p: str | None, default: Path) -> Path:
         if not p:
