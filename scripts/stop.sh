@@ -2,11 +2,13 @@
 # Stop the voice loop, the display app and the on-demand TTS server, and unload the LLM.
 set -uo pipefail
 source "$(dirname "$0")/_env.sh"
-pkill -INT -f "adria_harness|bin/adria voice" 2>/dev/null
+# The voice loop, with or without options before "voice" (the app adds --quiet).
+voice_loop='bin/adria( -[-a-z]+)* voice'
+pkill -INT -f "$voice_loop" 2>/dev/null
 # The harness saves a summary of the current conversation with the LLM before it
 # exits; wait for that before unloading the model.
 for _ in $(seq 1 120); do
-  pgrep -f "adria_harness|bin/adria voice" >/dev/null || break
+  pgrep -f "$voice_loop" >/dev/null || break
   sleep 1
 done
 pkill -TERM -f "irodori_openai_tts" 2>/dev/null
