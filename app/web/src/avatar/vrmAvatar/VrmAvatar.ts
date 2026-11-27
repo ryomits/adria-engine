@@ -55,20 +55,28 @@ export async function createVrmAvatar(
     render(frame: AvatarFrame, dt: number) {
       const still = options.still;
       clockSec += dt;
+      // The state is shown by the body: asleep in standby, attentive while
+      // listening, and so on (eased inside ProceduralMotion).
+      motion.update(dt, frame.state);
       const em = vrm.expressionManager;
+      // Expression of the line being spoken, combined with the mood of the state.
       const goal = resolveExpression(config.expressions, frame.expression);
       for (const name of moodNames) {
         mood[name] = still
           ? (goal[name] ?? 0)
           : approach({ current: mood[name], target: goal[name] ?? 0, dt, tau: 0.15 });
-        em?.setValue(name, mood[name]);
+      }
+      for (const name of new Set([...moodNames, ...Object.keys(motion.mood)])) {
+        em?.setValue(name, Math.max(mood[name] ?? 0, motion.mood[name] ?? 0));
       }
       em?.setValue(config.lipSync.expression, frame.mouth);
-      if (!still) {
+      // Eyes: closed while asleep, otherwise open with an occasional blink.
+      let blink = 0;
+      if (!still && motion.blinks) {
         if (clockSec > blinkAt + 0.2) blinkAt = clockSec + nextBlinkInterval(Math.random());
-        em?.setValue("blink", blinkWeight(clockSec - blinkAt));
-        motion.update(dt, frame.state);
+        blink = blinkWeight(clockSec - blinkAt);
       }
+      em?.setValue("blink", Math.max(motion.eyesClosed, blink));
       const framing = config.framing[frame.state];
       vrm.scene.position.x = still ? rig.snap(framing) : rig.update(dt, framing);
       vrm.update(dt);

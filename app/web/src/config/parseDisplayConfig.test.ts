@@ -35,6 +35,11 @@ describe("parseDisplayConfig", () => {
     );
   });
 
+  it("frames the sleeping character no farther away than a listening one by default", () => {
+    const { framing } = parseDisplayConfig({});
+    expect(framing.idle.distance).toBeLessThanOrEqual(framing.listening.distance);
+  });
+
   it("overrides only the given framing fields", () => {
     const cfg = parseDisplayConfig({ vrm: "a.vrm", framing: { speaking: { distance: 0.9 } } });
     expect(cfg.framing.speaking.fov).toBe(parseDisplayConfig({ vrm: "a.vrm" }).framing.speaking.fov);

@@ -24,16 +24,16 @@ A click while ADRIA is thinking or speaking lets the current reply finish, then 
 
 ## The four states
 
-The harness writes the state; the page shows it in two ways: the avatar, and a badge in the top-right corner (color and icon) that stays the same whatever avatar is used.
+The harness writes the state; the character alone shows it, with no icons or labels around it.
 
-| State | Meaning | Badge | Placeholder character |
+| State | Meaning | VRM character | Placeholder character |
 |---|---|---|---|
-| `idle` | Standby; microphone closed | grey, "z z" | grey-blue, sleepy eyes, slow bobbing |
-| `listening` | Conversation on; microphone open | green, microphone | green, eyes open, a slowly breathing ring |
-| `thinking` | Reply being generated or synthesized | amber, three dots | amber, eyes up and aside, dots above the head |
-| `speaking` | Reply being played | coral, speaker | coral, the mouth follows the voice |
+| `idle` | Standby; microphone closed | asleep: eyes closed, head drooping, slow deep breaths, no blinking | grey-blue, eyes closed, "z" drifting up |
+| `listening` | Conversation on; microphone open | awake: eyes open, leaning in, small nods, a soft smile | green, eyes open, a slowly breathing ring |
+| `thinking` | Reply being generated or synthesized | looking up and aside, head tilted | amber, eyes up and aside, dots above the head |
+| `speaking` | Reply being played | the mouth follows the voice, slight head motion | coral, the mouth follows the voice |
 
-Motion is deliberately small and slow.
+Changes between states are eased (falling asleep and waking up take about a second), and motion is deliberately small and slow. The VRM poses are in `app/web/src/motion/statePose.ts`.
 
 ## Avatars (the replaceable layer)
 
@@ -42,7 +42,7 @@ The shell (`app/web/src/main.ts`) turns the signals into one frame per animation
 - `avatar/placeholder/`: a simple round character on a 2D canvas.
 - `avatar/vrmAvatar/`: a VRM model with three.js and @pixiv/three-vrm (expressions, lip sync, blinking, procedural motion, per-state framing).
 
-A new avatar is another `AvatarView` implementation plus one line in `createAvatar` in `main.ts`; the window, the badge, the signals and the harness do not change.
+A new avatar is another `AvatarView` implementation plus one line in `createAvatar` in `main.ts`; the window, the signals and the harness do not change.
 
 ## Settings: `ADRIA_HOME/display.json`
 
@@ -74,7 +74,7 @@ Swapping VRM models needs no code change: put the VRM under `avatars/`, change `
 
 | State | target | distance | modelX | Gesture |
 |---|---|---|---|---|
-| idle | (0, 0.85, 0) | 3.2 | 0.25 | full body; occasional glances |
+| idle | (0, 1.2, 0) | 2.0 | 0 | upper body, so the sleeping face is visible |
 | listening | (0, 1.1, 0) | 2.2 | 0.1 | small nods |
 | thinking | (0, 1.1, 0) | 2.2 | 0.1 | head tilt |
 | speaking | (0, 1.25, 0) | 1.6 | 0 | bust-up; slight head motion |
@@ -134,11 +134,12 @@ Window
 
 States and conversation
 
-- [ ] At start: standby (grey badge), and no microphone indicator in the menu bar
-- [ ] Click: green badge (listening) and the orange microphone indicator appears
-- [ ] Speak: amber (thinking) after you stop, then coral (speaking) while the reply plays; the mouth follows the voice; back to green afterwards
-- [ ] Click while green: back to standby; the microphone indicator disappears
+- [ ] At start: the character is asleep, and there is no microphone indicator in the menu bar
+- [ ] Click: the character wakes up and listens, and the orange microphone indicator appears
+- [ ] Speak: the character looks up (thinking) after you stop, then talks while the reply plays; the mouth follows the voice; back to listening afterwards
+- [ ] Click while listening: the character falls asleep; the microphone indicator disappears
 - [ ] Click while speaking: the reply finishes, then standby
 - [ ] Stay silent for the timeout (set `idle_timeout_min = 1` to check quickly): back to standby by itself, and a summary appears in `memory/summary.md` if something worth remembering was said
 - [ ] The four states are easy to tell apart at a glance from a child's distance, and the motion is calm
-- [ ] With `"avatar": "vrm"`: the same badge and states, and the framing moves between states without jumps
+- [ ] With the placeholder (`"avatar": "placeholder"`): the same four states are easy to tell apart
+- [ ] The framing and the pose move between states without jumps
