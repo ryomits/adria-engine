@@ -62,10 +62,13 @@ Rebuild after moving `adria-home`, because the build records its location in the
 
 ## 5. Start, talk, stop
 
-- Start: double-click `scripts/start.command` in Finder (or run `scripts/start.sh`). It opens the display app when it has been built, then starts the voice loop in standby.
-- Talk: click the character. The microphone opens only while a conversation is on; click again, or stay silent for `[conversation] idle_timeout_min` minutes, to go back to standby.
+- **Everyday start**: double-click `app/build/ADRIA.app` (it can be dragged to the Dock). The app starts the voice loop itself, with no Terminal window. Only warnings and errors are logged, to `ADRIA_HOME/runtime/logs/harness.log` (no conversation text; replaced at each start).
+  - The first time, macOS asks for microphone permission for ADRIA. An ad-hoc signed app may be asked again after a rebuild.
+- **Debug start**: double-click `scripts/start.command` (or run `scripts/start.sh`). The voice loop runs in a Terminal window with full logs, and the app is told not to start its own.
   - The first time, macOS asks for microphone permission for Terminal.
-- Stop: quit the display app (right-click → Quit ADRIA, or Cmd-Q); the voice loop saves the conversation summary and exits too. Ctrl-C or closing the Terminal window stops only the voice loop. `scripts/stop.sh` stops everything: the voice loop, the display app, the TTS server, and the loaded LLM.
+- Only one voice loop runs at a time; a second one exits with "already running".
+- Talk: click the character. The microphone opens only while a conversation is on; click again, or stay silent for `[conversation] idle_timeout_min` minutes, to go back to standby.
+- Stop: quit the display app (right-click → Quit ADRIA, or Cmd-Q); the voice loop saves the conversation summary and exits too. In a debug start, Ctrl-C or closing the Terminal window stops only the voice loop. `scripts/stop.sh` stops everything: the voice loop, the display app, the TTS server, and the loaded LLM.
 
 ## Commands for checking
 
@@ -73,6 +76,7 @@ Rebuild after moving `adria-home`, because the build records its location in the
 source adria-engine/scripts/_env.sh
 adria chat                 # type to talk; replies are spoken
 adria voice --start        # voice loop that starts listening without a click (no display app needed)
+adria -q voice             # only warnings and errors (how the app runs it)
 adria say "こんにちは。"     # speak one line
 adria e2e a.wav b.wav      # treat WAV files as speech, run the full path, print latency (--mute for silence)
 ```
