@@ -5,6 +5,7 @@ import WebKit
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var window: CharacterWindow?
+    private var control: ControlChannel?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         installMenu()
@@ -23,12 +24,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             fail("The app bundle has no web resources.")
             return
         }
-        let window = CharacterWindow(settings: settings, home: home, webRoot: webRoot)
+        let control = ControlChannel(runtime: home.appendingPathComponent("runtime"))
+        self.control = control
+        let window = CharacterWindow(settings: settings, home: home, webRoot: webRoot) {
+            Self.send(.toggle, via: control)
+        }
         window.orderFrontRegardless()
         self.window = window
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+
+    /// Quitting the app (menu, Cmd-Q, Dock) also ends the conversation and the harness.
+    func applicationWillTerminate(_ notification: Notification) {
+        if let control { Self.send(.quit, via: control) }
+    }
+
+    private static func send(_ command: ControlChannel.Command, via control: ControlChannel) {
+        do {
+            try control.send(command)
+        } catch {
+            pageLogger.error("could not send \(command.rawValue, privacy: .public): \(error.localizedDescription, privacy: .public)")
+        }
+    }
 
     private func locateHome() -> URL? {
         let bundled = Bundle.main.url(forResource: "adria_home", withExtension: nil)

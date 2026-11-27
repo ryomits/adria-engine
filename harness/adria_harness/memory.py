@@ -1,12 +1,11 @@
-"""Long-term memory: per-persona session summaries.
+"""Long-term memory: session summaries.
 
 - When a session ends, the LLM summarizes it and the summary is appended to
-  ``memory/<persona>.md`` in the private home. Only summaries are kept; no
+  ``memory/summary.md`` in the private home. Only summaries are kept; no
   audio and no full transcript ever enter this file.
-- When a file grows beyond ``max_chars``, the LLM merges it into one shorter
+- When the file grows beyond ``max_chars``, the LLM merges it into one shorter
   summary.
-- At the start of each request the persona's file is added to its system
-  prompt. Files are keyed by persona name, so personas never share memories.
+- At the start of each request the file is added to the system prompt.
 """
 
 from __future__ import annotations
@@ -19,7 +18,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from .fileio import write_atomic
-from .persona import Persona, check_name
+from .persona import Persona
 from .sessions import Session
 
 log = logging.getLogger(__name__)
@@ -88,26 +87,23 @@ def grounded_memos(reply: str, user_said: list[str]) -> list[str]:
 
 
 class MemoryStore:
-    def __init__(self, memory_dir: Path):
-        self.dir = memory_dir
+    def __init__(self, path: Path):
+        self.path = path
 
-    def path(self, persona: str) -> Path:
-        return self.dir / f"{check_name(persona)}.md"
-
-    def read(self, persona: str) -> str:
+    def read(self) -> str:
         try:
-            return self.path(persona).read_text(encoding="utf-8").strip()
+            return self.path.read_text(encoding="utf-8").strip()
         except FileNotFoundError:
             return ""
 
-    def append(self, persona: str, day: dt.date, summary: str) -> None:
-        current = self.read(persona)
+    def append(self, day: dt.date, summary: str) -> None:
+        current = self.read()
         entry = f"## {day.isoformat()}\n{summary.strip()}"
-        self.replace(persona, f"{current}\n\n{entry}" if current else entry)
+        self.replace(f"{current}\n\n{entry}" if current else entry)
 
-    def replace(self, persona: str, text: str) -> None:
-        self.dir.mkdir(parents=True, exist_ok=True)
-        write_atomic(self.path(persona), text.strip() + "\n")
+    def replace(self, text: str) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        write_atomic(self.path, text.strip() + "\n")
 
 
 def build_system_prompt(persona: Persona, memory: str) -> str:
@@ -121,14 +117,14 @@ ChatFn = Callable[..., str]  # (messages, json_output=False) -> reply text
 
 class Summarizer:
     def __init__(self, chat: ChatFn, store: MemoryStore, max_chars: int,
-                 personas: Callable[[str], Persona]):
+                 persona: Callable[[], Persona]):
         self.chat = chat
         self.store = store
         self.max_chars = max_chars
-        self.personas = personas
+        self.persona = persona  # re-read for every summary, like for replies
 
     def summarize(self, session: Session, day: dt.date) -> None:
-        persona = self.personas(session.persona)
+        persona = self.persona()
         focus = "、".join(persona.memory.focus)
         transcript = "\n".join(
             f"{persona.memory.user_label}: {user}\n{ASSISTANT_LABEL}: {reply}"
@@ -140,15 +136,15 @@ class Summarizer:
         ], json_output=True)
         memos = grounded_memos(reply, [user for user, _ in session.turns])
         if not memos:
-            log.info("session with %s: nothing to remember", persona.name)
+            log.info("session summary: nothing to remember")
             return
         summary = "\n".join(f"- {m}" for m in memos)
-        self.store.append(persona.name, day, summary)
-        log.info("saved a session summary for %s (%d chars)", persona.name, len(summary))
+        self.store.append(day, summary)
+        log.info("saved a session summary (%d chars)", len(summary))
         self._compact_if_needed(persona, focus, day)
 
     def _compact_if_needed(self, persona: Persona, focus: str, day: dt.date) -> None:
-        memory = self.store.read(persona.name)
+        memory = self.store.read()
         if len(memory) <= self.max_chars:
             return
         merged = self.chat([
@@ -158,9 +154,7 @@ class Summarizer:
         ]).strip()
         if not merged or len(merged) >= len(memory):
             # Never lose memories to a bad merge; try again after the next session.
-            log.warning("memory compaction for %s gave no shorter result; kept as is",
-                        persona.name)
+            log.warning("memory compaction gave no shorter result; kept as is")
             return
-        self.store.replace(persona.name, f"## {day.isoformat()} までのまとめ\n{merged}")
-        log.info("compacted memory for %s: %d -> %d chars", persona.name, len(memory),
-                 len(merged))
+        self.store.replace(f"## {day.isoformat()} までのまとめ\n{merged}")
+        log.info("compacted memory: %d -> %d chars", len(memory), len(merged))

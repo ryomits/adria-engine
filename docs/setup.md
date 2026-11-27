@@ -11,7 +11,7 @@ All inference (LLM, speech synthesis, speech recognition) runs on the Mac. The n
 ```
 <anywhere>/
   adria-engine/   public: the machinery (this repository)
-  adria-home/     private: personas, memory, settings, reference voice
+  adria-home/     private: persona, memory, settings, reference voice, avatar models
 ```
 
 If `adria-home` lives elsewhere, point to it with the `ADRIA_HOME` environment variable.
@@ -20,11 +20,11 @@ If `adria-home` lives elsewhere, point to it with the `ADRIA_HOME` environment v
 
 ```bash
 cp adria-engine/persona-templates/config.example.toml adria-home/config.toml
-cp adria-engine/persona-templates/child.example.md adria-home/personas/child.md
-cp adria-engine/persona-templates/parent.example.md adria-home/personas/parent.md
+cp adria-engine/persona-templates/persona.example.md adria-home/persona.md
+cp adria-engine/persona-templates/display.example.json adria-home/display.json
 ```
 
-Replace the placeholder name in the persona files. See [personas.md](personas.md) for the format.
+Replace the placeholder name in `persona.md`. See [personas.md](personas.md) for the format.
 
 Clone Irodori-TTS-Server and set `[tts] server_dir` in `config.toml` to its location:
 
@@ -38,7 +38,7 @@ git clone https://github.com/Aratako/Irodori-TTS-Server.git <anywhere>
 adria-engine/scripts/setup.sh
 ```
 
-This fetches the LLM (Ollama), Whisper (MLX), the speaker-embedding model (SpeechBrain ECAPA), and Irodori-TTS with its codec. The first TTS download can take over ten minutes.
+This fetches the LLM (Ollama), Whisper (MLX), and Irodori-TTS with its codec. The first TTS download can take over ten minutes.
 
 ## 3. Fix the voice (optional, recommended)
 
@@ -51,38 +51,30 @@ adria make-voice adria   # writes adria-home/voices/adria.wav (not tracked by Gi
 
 Then set `[tts] voice = "adria"` in `config.toml`.
 
-## 4. Register family voices (optional)
-
-Without enrolled voices everyone talks to the child persona. To give parents their own persona, enroll each voice and map it in `[speakers.map]`; see [speakers.md](speakers.md).
-
-```bash
-adria enroll papa          # speak for about 20 seconds
-adria speakers             # enrolled voices and their personas
-```
-
-## 5. Build the display app
+## 4. Build the display app
 
 ```bash
 adria-engine/scripts/build-app.sh   # writes app/build/ADRIA.app (no Xcode needed)
 ```
 
-Copy `persona-templates/display.example.json` to `adria-home/display.json` and point `vrm` at a model in `adria-home/avatars/` first. See [display.md](display.md) for the settings.
+`display.json` shows the placeholder character; to use a VRM model, put it in `adria-home/avatars/` and set `vrm` (and remove `"avatar": "placeholder"`). See [display.md](display.md) for the settings.
 Rebuild after moving `adria-home`, because the build records its location in the app.
 
-## 6. Start and stop
+## 5. Start, talk, stop
 
-- Start: double-click `scripts/start.command` in Finder (or run `scripts/start.sh`). It opens the display app when it has been built, then starts the voice loop.
+- Start: double-click `scripts/start.command` in Finder (or run `scripts/start.sh`). It opens the display app when it has been built, then starts the voice loop in standby.
+- Talk: click the character. The microphone opens only while a conversation is on; click again, or stay silent for `[conversation] idle_timeout_min` minutes, to go back to standby.
   - The first time, macOS asks for microphone permission for Terminal.
-- Stop: Ctrl-C or close the Terminal window (the display app stays open; quit it with Cmd-Q). `scripts/stop.sh` stops everything: the voice loop, the display app, the TTS server, and the loaded LLM.
+- Stop: quit the display app (right-click → Quit ADRIA, or Cmd-Q); the voice loop saves the conversation summary and exits too. Ctrl-C or closing the Terminal window stops only the voice loop. `scripts/stop.sh` stops everything: the voice loop, the display app, the TTS server, and the loaded LLM.
 
 ## Commands for checking
 
 ```bash
 source adria-engine/scripts/_env.sh
-adria chat                 # type to talk; replies are spoken (--persona parent)
+adria chat                 # type to talk; replies are spoken
+adria voice --start        # voice loop that starts listening without a click (no display app needed)
 adria say "こんにちは。"     # speak one line
 adria e2e a.wav b.wav      # treat WAV files as speech, run the full path, print latency (--mute for silence)
-adria identify a.wav       # which enrolled voice a file sounds like, and the persona it would get
 ```
 
 ## Files shared with the display app
@@ -93,8 +85,9 @@ Runtime files live in `ADRIA_HOME/runtime/` (not tracked by Git).
 |---|---|
 | `queue.jsonl` | Playback queue, one JSON object per line. Written to `.part` first, then renamed |
 | `now_playing` | The line being heard (its `x_` keys, `started_at` including output latency, `duration`, and the lip-sync `mouth` curve), or `{"playing": false}` |
-| `state` | `idle` (waiting) / `listening` (the child is speaking, or STT is running) / `thinking` (LLM generating, or the reply is being synthesized) / `speaking` |
-| `metrics.jsonl` | Latency measurements, speaker ids and scores. No conversation text |
+| `state` | `idle` (standby, microphone closed) / `listening` (conversation on) / `thinking` (LLM generating, or the reply is being synthesized) / `speaking` |
+| `control.jsonl` | Commands from the display app (`toggle`, `quit`); written only by the app |
+| `metrics.jsonl` | Latency measurements. No conversation text |
 
 Keys starting with `x_` in a dialog line (expression and so on) are hints for the display side and are never sent to the TTS.
 
@@ -102,9 +95,7 @@ Keys starting with `x_` in a dialog line (expression and so on) are hints for th
 
 | Location in `ADRIA_HOME` | Content | Git |
 |---|---|---|
-| `memory/<persona>.md` | Session summaries per persona (the long-term memory) | tracked in the private repository |
+| `memory/summary.md` | Session summaries (the long-term memory) | tracked in the private repository |
 | `conversation-logs/YYYY-MM-DD.jsonl` | Full transcript for parents; deleted after 7 days; never read by the harness | ignored |
-| `voiceprints/<speaker>.npy` | Speaker embeddings (not audio) | ignored |
-| `models/` | Link to the speaker-embedding model | ignored |
 
 No audio from the microphone is ever written to disk.

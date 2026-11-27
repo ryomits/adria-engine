@@ -14,8 +14,12 @@ struct WindowSettingsTests {
         #expect(try decode(#"{"vrm": "a.vrm"}"#) == WindowSettings())
     }
 
-    @Test func readsClickThrough() throws {
-        #expect(try decode(#"{"window": {"clickThrough": true}}"#).clickThrough)
+    @Test func defaultWindowIsSmall() {
+        #expect(WindowSettings().width * WindowSettings().height <= 300 * 400)
+    }
+
+    @Test func readsSize() throws {
+        #expect(try decode(#"{"window": {"width": 200, "height": 260}}"#).height == 260)
     }
 
     @Test func readsLevel() throws {

@@ -1,9 +1,5 @@
 +++
 # Settings the harness hands to the other layers. Everything is optional.
-[voice]
-reference = "adria"          # ADRIA_HOME/voices/adria.wav ("none" = caption only)
-caption = "明るくやさしい、若い女性の声。子どもに話しかけるような、ゆっくりした話し方。"
-
 [reply]
 max_sentences = 3            # the harness stops speaking after this many sentences
 max_chars = 90               # ... or before going past this many characters

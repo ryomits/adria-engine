@@ -70,9 +70,8 @@ class Player:
     # ---------- internals ----------
 
     def _synth(self, item: dict) -> tuple[np.ndarray, int, float]:
-        fields = tts_fields(item)
         t0 = time.monotonic()
-        wav = self.tts.synthesize(fields["text"], fields.get("voice"), fields.get("caption"))
+        wav = self.tts.synthesize(tts_fields(item)["text"])
         data, sr = sf.read(io.BytesIO(wav), dtype="float32")
         return data, sr, time.monotonic() - t0
 

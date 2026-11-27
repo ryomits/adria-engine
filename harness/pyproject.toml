@@ -9,7 +9,6 @@ dependencies = [
     "soundfile>=0.13",
     "mlx-whisper>=0.4",
     "silero-vad>=5.1",
-    "speechbrain==1.1.2",
 ]
 
 [project.optional-dependencies]

@@ -7,16 +7,16 @@ from adria_harness.summary_worker import SummaryWorker
 
 class FakeSummarizer:
     def __init__(self):
-        self.done: list[str] = []
+        self.done: list[str] = []  # first user line of each summarized session
         self.event = threading.Event()
 
     def summarize(self, session, day):
-        self.done.append(session.persona)
+        self.done.append(session.turns[0][0])
         self.event.set()
 
 
-def ended(persona="child"):
-    return Session(persona, [("u", "a")])
+def ended(user="u"):
+    return Session([(user, "a")])
 
 
 def test_submitted_session_is_summarized():
@@ -42,15 +42,15 @@ def test_drain_finishes_pending_summaries():
     s = FakeSummarizer()
     worker = SummaryWorker(s, may_run=lambda: False, poll_sec=0.01)
     worker.start()
-    worker.submit(ended("child"))
-    worker.submit(ended("parent"))
+    worker.submit(ended("first"))
+    worker.submit(ended("second"))
     worker.drain(timeout=1.0)
-    assert s.done == ["child", "parent"]
+    assert s.done == ["first", "second"]
 
 
 class FailingSummarizer(FakeSummarizer):
     def summarize(self, session, day):
-        if session.persona == "bad":
+        if session.turns[0][0] == "bad":
             raise RuntimeError("llm down")
         super().summarize(session, day)
 
@@ -60,6 +60,6 @@ def test_a_failed_summary_does_not_stop_the_worker():
     worker = SummaryWorker(s, may_run=lambda: True, poll_sec=0.01)
     worker.start()
     worker.submit(ended("bad"))
-    worker.submit(ended("child"))
+    worker.submit(ended("good"))
     worker.drain(timeout=1.0)
-    assert s.done == ["child"]
+    assert s.done == ["good"]
