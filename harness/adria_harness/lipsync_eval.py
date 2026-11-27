@@ -11,10 +11,6 @@ import numpy as np
 
 from .lipsync import LipSyncParams, normalized_level
 
-__all__ = [
-    "closed_in_silence", "flap_rate", "normalized_level", "onset_lags_ms", "rapid_reversal_rate",
-]
-
 OPEN_THRESHOLD = 0.3  # mouth value that counts as visibly open
 MIN_GAP_FRAMES = 5  # quiet frames required before a new onset
 MAX_LAG_MS = 300.0  # an onset not followed by an opening within this counts as this lag

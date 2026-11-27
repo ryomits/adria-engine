@@ -70,10 +70,6 @@ class Status:
             self._state = state
             write_json_atomic(self.state_path, {"state": state, "since": time.time()})
 
-    @property
-    def state(self) -> str:
-        return self._state or "idle"
-
 
 class Metrics:
     """Latency metrics (timestamps only, never conversation text)."""

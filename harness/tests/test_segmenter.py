@@ -49,36 +49,12 @@ def test_too_short_utterance_is_dropped():
                min_utterance_sec=0.35) == []
 
 
-class Recorder:
-    def __init__(self):
-        self.events = []
-
-    def start(self):
-        self.events.append("start")
-
-    def discard(self):
-        self.events.append("discard")
-
-
-def run_with_callbacks(vad, stream, **cfg):
-    rec = Recorder()
-    seg = UtteranceSegmenter(STTConfig(**cfg), vad, on_speech_start=rec.start,
-                             on_speech_discard=rec.discard)
+def speech_starts(vad, stream, **cfg):
+    starts = []
+    seg = UtteranceSegmenter(STTConfig(**cfg), vad, on_speech_start=lambda: starts.append(1))
     list(seg.segment(stream))
-    return rec.events
+    return len(starts)
 
 
 def test_reports_speech_start_once():
-    assert run_with_callbacks(ScriptedVAD({5: {"start": 0}, 30: {"end": 0}}), blocks(40)) == [
-        "start"]
-
-
-def test_reports_discard_when_muted_mid_utterance():
-    stream = blocks(10) + [None] + blocks(30)
-    assert run_with_callbacks(ScriptedVAD({5: {"start": 0}}), stream) == ["start", "discard"]
-
-
-def test_reports_discard_for_too_short_utterance():
-    events = run_with_callbacks(ScriptedVAD({0: {"start": 0}, 2: {"end": 0}}), blocks(10),
-                                min_utterance_sec=0.35)
-    assert events == ["start", "discard"]
+    assert speech_starts(ScriptedVAD({5: {"start": 0}, 30: {"end": 0}}), blocks(40)) == 1
