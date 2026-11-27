@@ -114,7 +114,13 @@ The page reports load events and errors to the unified log:
 
 ## Checks on the Mac (by a person)
 
-GUI windows and the microphone cannot be verified from a shell session, so these are done on the Mac. Build first with `scripts/build-app.sh`, then start with `scripts/start.command`.
+GUI windows and the microphone cannot be verified from a shell session, so these are done on the Mac. Build first with `scripts/build-app.sh`.
+
+Starting
+
+- [ ] Double-click `app/build/ADRIA.app`: the character appears and no Terminal window opens; the first time, macOS asks for microphone permission for ADRIA
+- [ ] Quit, then double-click `scripts/start.command`: a Terminal window shows the logs, and only one voice loop runs (no "already running" in the Terminal)
+- [ ] After quitting an everyday start, `runtime/logs/harness.log` has no conversation text
 
 Window
 
@@ -122,7 +128,7 @@ Window
 - [ ] Switching to another app: the character stays visible and in front
 - [ ] Moving to another Space (Mission Control): the character is there too
 - [ ] Dragging moves the window smoothly; releasing after a drag does not start a conversation
-- [ ] Right-click shows "Quit ADRIA"; it quits the app, and the Terminal shows the harness saving the summary and exiting
+- [ ] Right-click shows "Quit ADRIA"; it quits the app, and the voice loop saves the summary and exits (debug start: visible in the Terminal; everyday start: no `adria` process left after a few seconds)
 - [ ] Cmd-Q (with the app in front) does the same
 - [ ] Changing `corner`, `width` / `height` in display.json: the window follows after a restart
 

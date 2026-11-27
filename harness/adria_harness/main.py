@@ -33,6 +33,7 @@ from .config import Config, load_config  # noqa: E402
 from .control import ControlInbox  # noqa: E402
 from .controller import Controller  # noqa: E402
 from .conversation import Conversation  # noqa: E402
+from .instance import AlreadyRunning, single_instance  # noqa: E402
 from .llm import OllamaClient  # noqa: E402
 from .memory import MemoryStore, Summarizer  # noqa: E402
 from .persona import load_persona  # noqa: E402
@@ -154,9 +155,15 @@ class App:
         return result
 
 
-def _setup_logging(verbose: bool) -> None:
+def log_level(verbose: bool, quiet: bool) -> int:
+    if verbose:
+        return logging.DEBUG
+    return logging.WARNING if quiet else logging.INFO
+
+
+def _setup_logging(verbose: bool, quiet: bool) -> None:
     logging.basicConfig(
-        level=logging.DEBUG if verbose else logging.INFO,
+        level=log_level(verbose, quiet),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
         datefmt="%H:%M:%S",
     )
@@ -178,6 +185,14 @@ def cmd_chat(cfg: Config, args) -> None:
 
 
 def cmd_voice(cfg: Config, args) -> None:
+    try:
+        with single_instance(cfg.runtime_dir):
+            _voice_loop(cfg, args)
+    except AlreadyRunning as e:
+        sys.exit(str(e))
+
+
+def _voice_loop(cfg: Config, args) -> None:
     from .stt import MicListener, Transcriber
 
     stt = Transcriber(cfg.stt)
@@ -332,6 +347,8 @@ def _exit_on_signal(signum, frame):
 def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(prog="adria")
     p.add_argument("-v", "--verbose", action="store_true")
+    p.add_argument("-q", "--quiet", action="store_true",
+                   help="log only warnings and errors (when started by the display app)")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     def with_mute(sp):
@@ -363,7 +380,7 @@ def main(argv: list[str] | None = None) -> None:
     sp.set_defaults(func=cmd_tts_server)
 
     args = p.parse_args(argv)
-    _setup_logging(args.verbose)
+    _setup_logging(args.verbose, args.quiet)
     # Closing the Terminal window (SIGHUP) or stop.sh (SIGTERM) must still run
     # the cleanup that stops the TTS server; it runs in its own session and
     # would otherwise be left behind holding several GB of memory.

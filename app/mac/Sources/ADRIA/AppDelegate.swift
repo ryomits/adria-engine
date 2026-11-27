@@ -6,6 +6,7 @@ import WebKit
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var window: CharacterWindow?
     private var control: ControlChannel?
+    private var harness: Process?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         installMenu()
@@ -31,6 +32,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         window.orderFrontRegardless()
         self.window = window
+        startHarness(home: home)
+    }
+
+    /// Everyday use: the app runs the voice loop itself, so no Terminal window is needed.
+    /// The voice loop exits by itself when the app sends "quit".
+    private func startHarness(home: URL) {
+        guard let plan = HarnessLaunch.plan(
+            arguments: CommandLine.arguments, environment: ProcessInfo.processInfo.environment,
+            enginePath: Self.bundledString("adria_engine"), searchPath: Self.bundledString("search_path"),
+            home: home)
+        else {
+            pageLogger.notice("voice loop not started by the app (debug start or unknown engine)")
+            return
+        }
+        do {
+            try FileManager.default.createDirectory(at: plan.logFile.deletingLastPathComponent(),
+                                                    withIntermediateDirectories: true)
+            FileManager.default.createFile(atPath: plan.logFile.path, contents: nil)  // a fresh log per start
+            let process = Process()
+            process.executableURL = plan.executable
+            process.arguments = plan.arguments
+            process.environment = plan.environment
+            process.standardInput = FileHandle.nullDevice
+            process.standardOutput = FileHandle.nullDevice  // progress and conversation lines
+            process.standardError = try FileHandle(forWritingTo: plan.logFile)
+            process.terminationHandler = { p in
+                pageLogger.notice("voice loop exited with status \(p.terminationStatus, privacy: .public)")
+            }
+            try process.run()
+            harness = process
+            pageLogger.notice("voice loop started (pid \(process.processIdentifier, privacy: .public))")
+        } catch {
+            fail("Could not start the voice loop: \(error.localizedDescription). See \(plan.logFile.path).")
+        }
+    }
+
+    private static func bundledString(_ name: String) -> String? {
+        Bundle.main.url(forResource: name, withExtension: nil)
+            .flatMap { try? String(contentsOf: $0, encoding: .utf8) }?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
@@ -49,9 +90,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func locateHome() -> URL? {
-        let bundled = Bundle.main.url(forResource: "adria_home", withExtension: nil)
-            .flatMap { try? String(contentsOf: $0, encoding: .utf8) }
-        return HomeLocator.locate(environment: ProcessInfo.processInfo.environment, bundledPath: bundled)
+        HomeLocator.locate(environment: ProcessInfo.processInfo.environment,
+                           bundledPath: Self.bundledString("adria_home"))
     }
 
     private func installMenu() {
