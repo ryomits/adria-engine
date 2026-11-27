@@ -8,11 +8,14 @@
 //   state=...    fixed conversation state (with "still")
 //   expr=...     fixed expression name (with "still")
 //   mouth=0..1   fixed mouth openness (with "still")
+//   avatar=placeholder  show the placeholder character whatever display.json says
 //   vrm=avatars/x.vrm  show another model than display.json names
-import type { AvatarView } from "./avatar/AvatarView";
+import type { AvatarOptions, AvatarView } from "./avatar/AvatarView";
+import { createPlaceholderAvatar } from "./avatar/placeholder/PlaceholderAvatar";
 import { createVrmAvatar } from "./avatar/vrmAvatar/VrmAvatar";
-import { parseDisplayConfig } from "./config/parseDisplayConfig";
+import { parseDisplayConfig, type DisplayConfig } from "./config/parseDisplayConfig";
 import { selectVrmPath } from "./config/selectVrmPath";
+import { mountStateBadge } from "./indicator/stateBadge";
 import { reportToNative } from "./native/reportToNative";
 import { frameFromSignals, type AvatarFrame } from "./shell/frameFromSignals";
 import { parseState, type ConversationState, type NowPlaying } from "./signals/parseSignals";
@@ -32,14 +35,26 @@ function stillFrame(): AvatarFrame {
   };
 }
 
+async function createAvatar(config: DisplayConfig, options: AvatarOptions): Promise<AvatarView> {
+  const stage = document.getElementById("stage");
+  if (!stage) throw new Error("index.html has no #stage element");
+  if (params.get("avatar") === "placeholder" || config.vrm === null || config.avatar === "placeholder") {
+    reportToNative("avatar: placeholder");
+    return createPlaceholderAvatar(stage, options);
+  }
+  const vrmPath = selectVrmPath(config.vrm, params.get("vrm"));
+  const avatar = await createVrmAvatar(stage, config, `home/${vrmPath}`, options);
+  reportToNative(`avatar: loaded ${vrmPath}`);
+  return avatar;
+}
+
 async function main(): Promise<void> {
   const res = await fetch("home/display.json", { cache: "no-store" });
   if (!res.ok) throw new Error(`display.json: HTTP ${res.status}`);
   const config = parseDisplayConfig(await res.json());
 
-  const vrmPath = selectVrmPath(config.vrm, params.get("vrm"));
-  const avatar: AvatarView = await createVrmAvatar(document.body, config, `home/${vrmPath}`, { still });
-  reportToNative(`loaded ${vrmPath}`);
+  const showState = mountStateBadge(document.body);
+  const avatar = await createAvatar(config, { still });
   window.addEventListener("resize", () => avatar.resize(window.innerWidth, window.innerHeight));
 
   let state: ConversationState = "idle";
@@ -60,6 +75,7 @@ async function main(): Promise<void> {
       ? stillFrame()
       : frameFromSignals(state, nowPlaying, Date.now() / 1000, config.lipSync.fallbackHz);
     avatar.render(frame, dt);
+    showState(frame.state);
     if (debugEl && params.has("debug")) {
       debugEl.textContent = `state: ${frame.state}\nexpr:  ${frame.expression}\nmouth: ${frame.mouth.toFixed(2)}`;
     }

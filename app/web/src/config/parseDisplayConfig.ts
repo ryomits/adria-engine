@@ -11,8 +11,13 @@ export type Framing = {
   modelX: number;
 };
 
+/** Which renderer draws the character. Both follow the same frames. */
+export type AvatarKind = "placeholder" | "vrm";
+
 export type DisplayConfig = {
-  vrm: string;
+  avatar: AvatarKind;
+  /** VRM file under ADRIA_HOME (only for the "vrm" avatar). */
+  vrm: string | null;
   expressions: ExpressionTable;
   lipSync: { expression: string; fallbackHz: number };
   framing: Record<ConversationState, Framing>;
@@ -70,10 +75,23 @@ function parseFraming(raw: unknown, base: Framing, state: string): Framing {
   return out;
 }
 
-export function parseDisplayConfig(raw: unknown): DisplayConfig {
-  if (!isRecord(raw) || typeof raw.vrm !== "string" || raw.vrm === "") {
-    throw new ConfigError("display.json: vrm (path of the VRM file under ADRIA_HOME) is required");
+function parseAvatar(raw: Record<string, unknown>): { avatar: AvatarKind; vrm: string | null } {
+  if (raw.vrm !== undefined && (typeof raw.vrm !== "string" || raw.vrm === "")) {
+    throw new ConfigError("display.json: vrm must be the path of a VRM file under ADRIA_HOME");
   }
+  const vrm = typeof raw.vrm === "string" ? raw.vrm : null;
+  if (raw.avatar === undefined) return { avatar: vrm ? "vrm" : "placeholder", vrm };
+  if (raw.avatar !== "placeholder" && raw.avatar !== "vrm") {
+    throw new ConfigError(`display.json: avatar must be "placeholder" or "vrm", got ${JSON.stringify(raw.avatar)}`);
+  }
+  if (raw.avatar === "vrm" && !vrm) {
+    throw new ConfigError('display.json: avatar "vrm" needs vrm (path of the VRM file under ADRIA_HOME)');
+  }
+  return { avatar: raw.avatar, vrm };
+}
+
+export function parseDisplayConfig(raw: unknown): DisplayConfig {
+  if (!isRecord(raw)) throw new ConfigError("display.json must be a JSON object");
   const framingRaw = isRecord(raw.framing) ? raw.framing : {};
   const frame = (s: ConversationState) => parseFraming(framingRaw[s], DEFAULT_FRAMING[s], s);
   const framing: Record<ConversationState, Framing> = {
@@ -84,7 +102,7 @@ export function parseDisplayConfig(raw: unknown): DisplayConfig {
   };
   const lip = isRecord(raw.lipSync) ? raw.lipSync : {};
   return {
-    vrm: raw.vrm,
+    ...parseAvatar(raw),
     expressions: parseExpressions(raw.expressions),
     lipSync: {
       expression: typeof lip.expression === "string" ? lip.expression : "aa",

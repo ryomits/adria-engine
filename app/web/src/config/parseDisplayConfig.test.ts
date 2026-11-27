@@ -2,8 +2,26 @@ import { describe, expect, it } from "vitest";
 import { parseDisplayConfig } from "./parseDisplayConfig";
 
 describe("parseDisplayConfig", () => {
-  it("requires the VRM path", () => {
-    expect(() => parseDisplayConfig({})).toThrow(/vrm/);
+  it("uses the placeholder character without a VRM", () => {
+    expect(parseDisplayConfig({}).avatar).toBe("placeholder");
+  });
+
+  it("uses the VRM avatar when a VRM is set", () => {
+    expect(parseDisplayConfig({ vrm: "avatars/a.vrm" }).avatar).toBe("vrm");
+  });
+
+  it("can choose the placeholder although a VRM is set", () => {
+    expect(parseDisplayConfig({ vrm: "avatars/a.vrm", avatar: "placeholder" }).avatar).toBe(
+      "placeholder",
+    );
+  });
+
+  it("requires the VRM path for the VRM avatar", () => {
+    expect(() => parseDisplayConfig({ avatar: "vrm" })).toThrow(/vrm/);
+  });
+
+  it("rejects an unknown avatar", () => {
+    expect(() => parseDisplayConfig({ avatar: "robot" })).toThrow(/avatar/);
   });
 
   it("keeps the VRM path", () => {
