@@ -1,12 +1,12 @@
 {
+  "avatar": "placeholder",
   "vrm": "avatars/your-model.vrm",
   "window": {
-    "width": 420,
-    "height": 640,
+    "width": 240,
+    "height": 320,
     "corner": "bottomRight",
     "margin": 24,
-    "level": "front",
-    "clickThrough": false
+    "level": "front"
   },
   "expressions": {
     "neutral": {},
