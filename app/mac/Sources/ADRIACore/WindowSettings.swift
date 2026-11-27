@@ -13,20 +13,18 @@ public struct WindowSettings: Equatable, Decodable, Sendable {
     public var corner: Corner
     public var margin: Double
     public var level: Level
-    /// Clicks pass through to the windows behind. Off by default so a child can touch the character.
-    public var clickThrough: Bool
 
-    public init(width: Double = 420, height: Double = 640, corner: Corner = .bottomRight,
-                margin: Double = 24, level: Level = .front, clickThrough: Bool = false) {
+    /// A small window at the screen edge by default.
+    public init(width: Double = 240, height: Double = 320, corner: Corner = .bottomRight,
+                margin: Double = 24, level: Level = .front) {
         self.width = width
         self.height = height
         self.corner = corner
         self.margin = margin
         self.level = level
-        self.clickThrough = clickThrough
     }
 
-    enum CodingKeys: String, CodingKey { case width, height, corner, margin, level, clickThrough }
+    enum CodingKeys: String, CodingKey { case width, height, corner, margin, level }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -36,8 +34,7 @@ public struct WindowSettings: Equatable, Decodable, Sendable {
             height: try c.decodeIfPresent(Double.self, forKey: .height) ?? d.height,
             corner: try c.decodeIfPresent(Corner.self, forKey: .corner) ?? d.corner,
             margin: try c.decodeIfPresent(Double.self, forKey: .margin) ?? d.margin,
-            level: try c.decodeIfPresent(Level.self, forKey: .level) ?? d.level,
-            clickThrough: try c.decodeIfPresent(Bool.self, forKey: .clickThrough) ?? d.clickThrough
+            level: try c.decodeIfPresent(Level.self, forKey: .level) ?? d.level
         )
     }
 
