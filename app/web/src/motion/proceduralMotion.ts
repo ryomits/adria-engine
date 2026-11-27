@@ -1,23 +1,30 @@
-// Autonomous body motion: rest pose, breathing, idle glances and state gestures.
-// Runs entirely on the display side; the harness only provides the state.
+// Autonomous body motion: rest pose, breathing and the pose of each state
+// (see statePose). Runs entirely on the display side; the harness only
+// provides the state. Every value eases toward the pose of the current state,
+// so falling asleep and waking up are gradual.
 import type { VRM, VRMHumanBoneName } from "@pixiv/three-vrm";
+import type { ExpressionWeights } from "../expressions/resolveExpression";
 import { approach } from "../framing/approach";
 import type { ConversationState } from "../signals/parseSignals";
+import { statePose } from "./statePose";
 
-type Gesture = { headPitch: number; headYaw: number; headRoll: number };
-
-const TAU = 0.35;
+const TAU = 0.35; // head and body
+const EYES_TAU = 0.4; // eyes closing when falling asleep, opening when woken
 
 export class ProceduralMotion {
   private t = 0;
-  private glance = { yaw: 0, pitch: 0 };
-  private nextGlanceAt = 3;
-  private head: Gesture = { headPitch: 0, headYaw: 0, headRoll: 0 };
+  private breathPhase = 0;
+  private head = { pitch: 0, yaw: 0, roll: 0 };
+  private spine = 0;
+  private breathDepth = 0.015;
+  /** Eyelid closure from the state (0..1); blinking is added by the caller. */
+  eyesClosed = 0;
+  /** Whether the caller should blink now and then. */
+  blinks = true;
+  /** Expression weights for the state, eased. */
+  readonly mood: ExpressionWeights = {};
 
-  constructor(
-    private readonly vrm: VRM,
-    private readonly rand: () => number = Math.random,
-  ) {
+  constructor(private readonly vrm: VRM) {
     this.applyRestPose();
   }
 
@@ -37,49 +44,43 @@ export class ProceduralMotion {
     if (rl) rl.rotation.z = 0.12;
   }
 
+  /** Advance by `dt` seconds (0 snaps straight to the pose, for still frames). */
   update(dt: number, state: ConversationState): void {
     this.t += dt;
-    const t = this.t;
+    const pose = statePose(state, this.t);
+    const ease = (current: number, target: number, tau = TAU) =>
+      dt === 0 ? target : approach({ current, target, dt, tau });
 
-    // Breathing: slow chest rise and shoulder lift (about 4 s per breath).
-    const breath = Math.sin((2 * Math.PI * t) / 4);
+    this.head = {
+      pitch: ease(this.head.pitch, pose.headPitch),
+      yaw: ease(this.head.yaw, pose.headYaw),
+      roll: ease(this.head.roll, pose.headRoll),
+    };
+    this.spine = ease(this.spine, pose.spinePitch);
+    this.eyesClosed = ease(this.eyesClosed, pose.eyesClosed, EYES_TAU);
+    this.blinks = pose.blinks;
+    for (const name of new Set([...Object.keys(this.mood), ...Object.keys(pose.mood)])) {
+      this.mood[name] = ease(this.mood[name] ?? 0, pose.mood[name] ?? 0);
+    }
+
+    // Breathing: the phase advances continuously, so changing the rate
+    // (slower when asleep) never makes the chest jump.
+    this.breathPhase += (2 * Math.PI * dt) / pose.breathSec;
+    this.breathDepth = ease(this.breathDepth, pose.breathDepth);
+    const breath = Math.sin(this.breathPhase) * this.breathDepth;
+
+    const spine = this.bone("spine");
+    if (spine) spine.rotation.x = this.spine;
     const chest = this.bone("chest");
-    if (chest) chest.rotation.x = -0.015 * breath;
+    if (chest) chest.rotation.x = -breath;
     const ls = this.bone("leftShoulder");
     const rs = this.bone("rightShoulder");
-    if (ls) ls.rotation.z = 0.02 * breath;
-    if (rs) rs.rotation.z = -0.02 * breath;
-
-    // Occasional glances while idle.
-    if (t >= this.nextGlanceAt) {
-      this.glance = { yaw: (this.rand() - 0.5) * 0.3, pitch: (this.rand() - 0.5) * 0.1 };
-      this.nextGlanceAt = t + 4 + 6 * this.rand();
-    }
-
-    const target = this.gestureFor(state, t);
-    const k = { dt, tau: TAU };
-    this.head = {
-      headPitch: approach({ current: this.head.headPitch, target: target.headPitch, ...k }),
-      headYaw: approach({ current: this.head.headYaw, target: target.headYaw, ...k }),
-      headRoll: approach({ current: this.head.headRoll, target: target.headRoll, ...k }),
-    };
+    if (ls) ls.rotation.z = breath * 1.3;
+    if (rs) rs.rotation.z = -breath * 1.3;
     const neck = this.bone("neck");
     const head = this.bone("head");
-    if (neck) neck.rotation.set(this.head.headPitch * 0.4, this.head.headYaw * 0.4, this.head.headRoll * 0.4);
-    if (head) head.rotation.set(this.head.headPitch * 0.6, this.head.headYaw * 0.6, this.head.headRoll * 0.6);
-  }
-
-  private gestureFor(state: ConversationState, t: number): Gesture {
-    switch (state) {
-      case "listening":
-        // Small nods, about one per second.
-        return { headPitch: 0.07 * Math.max(0, Math.sin(2 * Math.PI * 1.0 * t)), headYaw: 0, headRoll: 0.04 };
-      case "thinking":
-        return { headPitch: -0.06, headYaw: 0.08, headRoll: 0.14 };
-      case "speaking":
-        return { headPitch: 0.02 * Math.sin(2 * Math.PI * 0.7 * t), headYaw: 0.04 * Math.sin(2 * Math.PI * 0.3 * t), headRoll: 0 };
-      default:
-        return { headPitch: this.glance.pitch, headYaw: this.glance.yaw, headRoll: 0 };
-    }
+    const { pitch, yaw, roll } = this.head;
+    if (neck) neck.rotation.set(pitch * 0.4, yaw * 0.4, roll * 0.4);
+    if (head) head.rotation.set(pitch * 0.6, yaw * 0.6, roll * 0.6);
   }
 }

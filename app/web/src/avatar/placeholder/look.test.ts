@@ -18,8 +18,12 @@ describe("placeholderLook", () => {
     expect(Math.max(...STATES.map((s) => placeholderLook(s, 0).hz))).toBeLessThanOrEqual(1);
   });
 
-  it("looks sleepy in standby", () => {
-    expect(placeholderLook("idle", 0).eyeOpen).toBeLessThan(placeholderLook("listening", 0).eyeOpen);
+  it("closes the eyes while sleeping in standby", () => {
+    expect(placeholderLook("idle", 0).eyeOpen).toBe(0);
+  });
+
+  it("shows sleeping z's only in standby", () => {
+    expect(STATES.filter((s) => placeholderLook(s, 0).sleepZ > 0)).toEqual(["idle"]);
   });
 
   it("looks up and aside while thinking", () => {

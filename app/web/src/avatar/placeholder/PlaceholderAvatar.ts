@@ -155,4 +155,18 @@ function draw(ctx: CanvasRenderingContext2D, s: Scene): void {
     ctx.arc(cx + r * (0.55 + i * 0.22), cy - r * (1.05 + i * 0.12), r * (0.05 + i * 0.02), 0, 2 * Math.PI);
     ctx.fill();
   }
+
+  // Sleeping z's: two letters drifting up from the head and fading out.
+  if (look.sleepZ > 0) {
+    ctx.fillStyle = INK;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    for (const offset of [0, 0.5]) {
+      const rise = (look.sleepZ + offset) % 1;
+      ctx.globalAlpha = 0.7 * Math.sin(Math.PI * rise);
+      ctx.font = `600 ${Math.round(r * (0.22 + 0.12 * rise))}px ui-rounded, system-ui, sans-serif`;
+      ctx.fillText("z", cx + r * (0.55 + 0.25 * rise), cy - r * (0.85 + 0.45 * rise));
+    }
+    ctx.globalAlpha = 1;
+  }
 }

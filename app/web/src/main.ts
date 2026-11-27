@@ -15,7 +15,6 @@ import { createPlaceholderAvatar } from "./avatar/placeholder/PlaceholderAvatar"
 import { createVrmAvatar } from "./avatar/vrmAvatar/VrmAvatar";
 import { parseDisplayConfig, type DisplayConfig } from "./config/parseDisplayConfig";
 import { selectVrmPath } from "./config/selectVrmPath";
-import { mountStateBadge } from "./indicator/stateBadge";
 import { reportToNative } from "./native/reportToNative";
 import { frameFromSignals, type AvatarFrame } from "./shell/frameFromSignals";
 import { parseState, type ConversationState, type NowPlaying } from "./signals/parseSignals";
@@ -53,7 +52,6 @@ async function main(): Promise<void> {
   if (!res.ok) throw new Error(`display.json: HTTP ${res.status}`);
   const config = parseDisplayConfig(await res.json());
 
-  const showState = mountStateBadge(document.body);
   const avatar = await createAvatar(config, { still });
   window.addEventListener("resize", () => avatar.resize(window.innerWidth, window.innerHeight));
 
@@ -75,7 +73,6 @@ async function main(): Promise<void> {
       ? stillFrame()
       : frameFromSignals(state, nowPlaying, Date.now() / 1000, config.lipSync.fallbackHz);
     avatar.render(frame, dt);
-    showState(frame.state);
     if (debugEl && params.has("debug")) {
       debugEl.textContent = `state: ${frame.state}\nexpr:  ${frame.expression}\nmouth: ${frame.mouth.toFixed(2)}`;
     }

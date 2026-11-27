@@ -28,7 +28,8 @@ export type DisplayConfig = AvatarChoice & {
 };
 
 const DEFAULT_FRAMING: Record<ConversationState, Framing> = {
-  idle: { target: [0, 0.85, 0], distance: 3.2, fov: 30, modelX: 0.25 },
+  // Upper body: the closed eyes and drooping head of the sleeping character must be visible.
+  idle: { target: [0, 1.2, 0], distance: 2.0, fov: 30, modelX: 0 },
   listening: { target: [0, 1.1, 0], distance: 2.2, fov: 30, modelX: 0.1 },
   thinking: { target: [0, 1.1, 0], distance: 2.2, fov: 30, modelX: 0.1 },
   speaking: { target: [0, 1.25, 0], distance: 1.6, fov: 30, modelX: 0 },
