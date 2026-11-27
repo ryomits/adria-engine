@@ -38,8 +38,7 @@ class SummaryWorker:
         self._thread.start()
 
     def submit(self, session: Session) -> None:
-        log.info("session with %s ended (%d turns); summary queued", session.persona,
-                 len(session.turns))
+        log.info("session ended (%d turns); summary queued", len(session.turns))
         self._jobs.put(session)
 
     def drain(self, timeout: float) -> bool:
@@ -62,6 +61,6 @@ class SummaryWorker:
                     time.sleep(self.poll_sec)
                 self.summarizer.summarize(session, dt.date.today())
             except Exception:
-                log.exception("session summary for %s failed", session.persona)
+                log.exception("session summary failed")
             finally:
                 self._jobs.task_done()

@@ -1,9 +1,8 @@
-"""Short-term conversation sessions, one persona at a time.
+"""The short-term conversation session.
 
-A session is the run of turns with one persona. It ends when the persona
-changes (another speaker), after ``idle_sec`` without a turn, or when the
-harness exits; an ended session is handed to the summarizer. History is kept
-in memory only and never crosses personas: a new persona always starts empty.
+A session is the run of turns since the last one ended. It ends after
+``idle_sec`` without a turn, or when the harness exits; an ended session is
+handed to the summarizer. History is kept in memory only.
 """
 
 from __future__ import annotations
@@ -16,7 +15,6 @@ from dataclasses import dataclass, field
 
 @dataclass
 class Session:
-    persona: str
     turns: list[tuple[str, str]] = field(default_factory=list)  # (user, reply)
     last_activity: float = 0.0
 
@@ -28,21 +26,9 @@ class SessionBook:
         self._lock = threading.Lock()
         self._current: Session | None = None
 
-    def begin(self, persona: str) -> Session | None:
-        """Make ``persona`` the active one. Returns the session this ended, if any."""
+    def history(self, max_turns: int | None = None) -> list[dict]:
         with self._lock:
-            ended = None
-            if self._current is not None and self._current.persona != persona:
-                ended = self._take()
-            if self._current is None:
-                self._current = Session(persona, last_activity=self.clock())
-            return ended
-
-    def history(self, persona: str, max_turns: int | None = None) -> list[dict]:
-        with self._lock:
-            if self._current is None or self._current.persona != persona:
-                return []
-            turns = self._current.turns
+            turns = [] if self._current is None else self._current.turns
             if max_turns is not None:
                 turns = turns[-max_turns:]
             messages = []
@@ -51,10 +37,10 @@ class SessionBook:
                              {"role": "assistant", "content": reply}]
             return messages
 
-    def record(self, persona: str, user: str, reply: str) -> None:
+    def record(self, user: str, reply: str) -> None:
         with self._lock:
-            if self._current is None or self._current.persona != persona:
-                self._current = Session(persona)
+            if self._current is None:
+                self._current = Session()
             self._current.turns.append((user, reply))
             self._current.last_activity = self.clock()
 

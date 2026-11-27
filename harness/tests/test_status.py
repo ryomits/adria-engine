@@ -24,7 +24,20 @@ def test_speaking_wins_over_preparing(tmp_path):
     assert state(tmp_path) == "speaking"
 
 
-def test_listening_while_the_child_speaks(tmp_path):
+def test_an_active_conversation_is_listening(tmp_path):
     s = Status(tmp_path)
-    s.update(listening=True)
+    s.update(active=True)
     assert state(tmp_path) == "listening"
+
+
+def test_thinking_wins_over_an_active_conversation(tmp_path):
+    s = Status(tmp_path)
+    s.update(active=True, preparing=True)
+    assert state(tmp_path) == "thinking"
+
+
+def test_standby_after_the_conversation_ends(tmp_path):
+    s = Status(tmp_path)
+    s.update(active=True)
+    s.update(active=False)
+    assert state(tmp_path) == "idle"

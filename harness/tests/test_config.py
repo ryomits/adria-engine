@@ -8,20 +8,12 @@ def home(tmp_path, toml=""):
     return load_config(tmp_path)
 
 
-def test_default_persona_is_child(tmp_path):
-    assert home(tmp_path).default_persona == "child"
-
-
-def test_default_persona_can_be_set(tmp_path):
-    assert home(tmp_path, '[personas]\ndefault = "kid"\n').default_persona == "kid"
-
-
-def test_personas_live_in_the_home(tmp_path):
-    assert home(tmp_path).persona_dir == tmp_path / "personas"
+def test_the_persona_lives_in_the_home(tmp_path):
+    assert home(tmp_path).persona_path == tmp_path / "persona.md"
 
 
 def test_memory_lives_in_the_home(tmp_path):
-    assert home(tmp_path).memory_dir == tmp_path / "memory"
+    assert home(tmp_path).memory_path == tmp_path / "memory" / "summary.md"
 
 
 def test_transcripts_live_in_the_home(tmp_path):
@@ -32,25 +24,31 @@ def test_transcripts_are_kept_for_seven_days_by_default(tmp_path):
     assert home(tmp_path).memory.transcript_retention_days == 7
 
 
-def test_speaker_map_is_read(tmp_path):
-    cfg = home(tmp_path, '[speakers.map]\nmom = "parent"\n')
-    assert cfg.speakers.map == {"mom": "parent"}
+def test_idle_timeout_defaults_to_five_minutes(tmp_path):
+    assert home(tmp_path).conversation.idle_timeout_sec == 300
 
 
-def test_voiceprints_default_to_the_home(tmp_path):
-    assert home(tmp_path).speakers.voiceprint_dir == tmp_path / "voiceprints"
+def test_idle_timeout_is_set_in_minutes(tmp_path):
+    cfg = home(tmp_path, "[conversation]\nidle_timeout_min = 1.5\n")
+    assert cfg.conversation.idle_timeout_sec == 90
 
 
-def test_relative_voiceprint_dir_is_resolved_against_the_home(tmp_path):
-    cfg = home(tmp_path, '[speakers]\nvoiceprint_dir = "vp"\n')
-    assert cfg.speakers.voiceprint_dir == tmp_path / "vp"
-
-
-def test_unknown_speaker_setting_is_rejected(tmp_path):
+def test_non_positive_idle_timeout_is_rejected(tmp_path):
     with pytest.raises(ConfigError):
-        home(tmp_path, "[speakers]\nthreshhold = 0.5\n")
+        home(tmp_path, "[conversation]\nidle_timeout_min = 0\n")
 
 
-def test_old_persona_setting_points_to_the_new_one(tmp_path):
-    with pytest.raises(ConfigError, match="personas"):
+def test_unknown_setting_is_rejected(tmp_path):
+    with pytest.raises(ConfigError):
+        home(tmp_path, "[memory]\nmax_char = 10\n")
+
+
+@pytest.mark.parametrize("section", ["personas", "speakers"])
+def test_removed_sections_are_rejected(tmp_path, section):
+    with pytest.raises(ConfigError, match=section):
+        home(tmp_path, f"[{section}]\n")
+
+
+def test_old_persona_setting_is_rejected(tmp_path):
+    with pytest.raises(ConfigError, match="persona.md"):
         home(tmp_path, '[general]\npersona = "personas/child.md"\n')

@@ -4,20 +4,12 @@ from adria_harness.tts import request_body
 CFG = TTSConfig(voice="adria", caption="あかるい声", num_steps=16, seed=42)
 
 
-def test_global_voice_is_used_by_default():
+def test_configured_voice_is_used():
     assert request_body(CFG, "やあ")["voice"] == "adria"
 
 
-def test_line_voice_overrides_the_global_voice():
-    assert request_body(CFG, "やあ", voice="parent")["voice"] == "parent"
-
-
-def test_global_caption_is_used_by_default():
+def test_configured_caption_is_used():
     assert request_body(CFG, "やあ")["irodori"]["caption"] == "あかるい声"
-
-
-def test_line_caption_overrides_the_global_caption():
-    assert request_body(CFG, "やあ", caption="ひくい声")["irodori"]["caption"] == "ひくい声"
 
 
 def test_text_is_sent_as_input():

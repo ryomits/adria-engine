@@ -8,7 +8,7 @@ NOW = dt.datetime(2026, 11, 25, 10, 0, 0)
 
 
 def entry():
-    return {"persona": "child", "speaker": None, "user": "いちごすき", "reply": "おいしいよね。"}
+    return {"user": "いちごすき", "reply": "おいしいよね。"}
 
 
 def test_turn_is_written_to_the_file_of_the_day(tmp_path):

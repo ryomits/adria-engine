@@ -3,8 +3,13 @@
 ``now_playing`` holds the line currently being played (including ``x_`` keys,
 which the display app uses for expressions), or ``{"playing": false}``.
 
-``state`` holds the coarse conversation state used for camera framing:
-``idle`` / ``listening`` / ``thinking`` / ``speaking``.
+``state`` holds the conversation state shown by the display:
+
+- ``idle``: standby; the microphone is closed
+- ``listening``: a conversation is on and the microphone is open
+- ``thinking``: a reply is being generated or synthesized
+- ``speaking``: a reply is being played
+
 Both files are written atomically.
 """
 
@@ -23,7 +28,7 @@ class Status:
         self.now_playing_path = runtime_dir / "now_playing"
         self.state_path = runtime_dir / "state"
         self._lock = threading.Lock()
-        self.listening = False  # the child is speaking or the speech is being transcribed
+        self.active = False  # a conversation is on (started by a click on the display)
         self.thinking = 0  # number of in-flight LLM generations
         self.speaking = False
         # Reply lines are queued or being synthesized but no sound has started yet.
@@ -55,7 +60,7 @@ class Status:
             return "speaking"
         if self.thinking or self.preparing:
             return "thinking"
-        if self.listening:
+        if self.active:
             return "listening"
         return "idle"
 
